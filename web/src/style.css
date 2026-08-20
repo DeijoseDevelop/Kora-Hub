@@ -906,7 +906,7 @@ kbd {
    Grafo
    ========================================================================== */
 
-.view-graph { position: relative; overflow: hidden; padding: 0; }
+.view-graph { position: relative; overflow: hidden; padding: 0; flex: 1; min-height: 0; }
 .graph-canvas { width: 100%; height: 100%; display: block; }
 
 .graph-legend {

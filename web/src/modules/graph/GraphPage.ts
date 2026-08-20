@@ -1,4 +1,4 @@
-import { NixComponent, html, type NixTemplate } from "@deijose/nix-js";
+import { NixComponent, effect, html, ref, type NixTemplate } from "@deijose/nix-js";
 import { router } from "../../router";
 import { localDocs } from "../../data/store";
 import { activeWs } from "../../data/workspace";
@@ -22,20 +22,18 @@ interface GEdge {
 // Grafo local-first: nodos = docs del mirror, aristas = backlinks
 // [[wikilinks]] extraídos localmente. 100% offline.
 export class GraphPage extends NixComponent {
-  private canvasRef: HTMLCanvasElement | null = null;
+  private canvasRef = ref<HTMLCanvasElement>();
   private nodes: GNode[] = [];
   private edges: GEdge[] = [];
   private anim: number | null = null;
+  private dispose: (() => void) | null = null;
   private rect = { width: 0, height: 0 };
   private dragging: GNode | null = null;
 
   render(): NixTemplate {
     return html`
       <div class="view-graph">
-        <canvas class="graph-canvas" ref=${(el: HTMLCanvasElement) => {
-          this.canvasRef = el;
-          this.bindCanvas();
-        }}></canvas>
+        <canvas class="graph-canvas" ref=${this.canvasRef}></canvas>
         <div class="graph-legend">
           <div class="legend-item"><span class="legend-dot"></span>Documento</div>
           <div class="legend-item"><span class="legend-line"></span>Backlink [[]]</div>
@@ -46,9 +44,21 @@ export class GraphPage extends NixComponent {
   }
 
   onMount(): (() => void) | void {
-    this.build();
+    // Los refs se resuelven tras el primer render: bind y build en el
+    // frame siguiente para que measure() vea el tamaño real.
+    requestAnimationFrame(() => {
+      this.bindCanvas();
+      this.build();
+    });
+    // Re-construir cuando el mirror local cambie (los docs llegan por
+    // pull async tras montar: sin esto el grafo queda vacío).
+    this.dispose = effect(() => {
+      localDocs.value;
+      this.build();
+    });
     window.addEventListener("resize", this.onResize);
     return () => {
+      if (this.dispose) this.dispose();
       window.removeEventListener("resize", this.onResize);
       if (this.anim) cancelAnimationFrame(this.anim);
     };
@@ -60,7 +70,7 @@ export class GraphPage extends NixComponent {
   };
 
   private measure(): void {
-    const c = this.canvasRef;
+    const c = this.canvasRef.el;
     if (!c) return;
     const dpr = window.devicePixelRatio || 1;
     this.rect = { width: c.clientWidth, height: c.clientHeight };
@@ -111,7 +121,7 @@ export class GraphPage extends NixComponent {
   }
 
   private bindCanvas(): void {
-    const c = this.canvasRef;
+    const c = this.canvasRef.el;
     if (!c) return;
     const down = (e: MouseEvent) => {
       const x = e.clientX - c.getBoundingClientRect().left;
@@ -152,7 +162,7 @@ export class GraphPage extends NixComponent {
 
   private animate(): void {
     if (this.anim) cancelAnimationFrame(this.anim);
-    const c = this.canvasRef;
+    const c = this.canvasRef.el;
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
