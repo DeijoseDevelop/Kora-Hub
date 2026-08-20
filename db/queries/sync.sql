@@ -1,4 +1,4 @@
--- Copyright (C) 2026 Zekrost <tech@zekrost.com>
+-- Copyright (C) 2026 Deijose <tech@deijose.dev>
 -- SPDX-License-Identifier: AGPL-3.0-only
 -- Sync delta (seccion 9): cursor monotono por workspace + push con
 -- deduplicacion por idempotency-key.

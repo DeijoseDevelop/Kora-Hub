@@ -1,4 +1,4 @@
--- Copyright (C) 2026 Zekrost <tech@zekrost.com>
+-- Copyright (C) 2026 Deijose <tech@deijose.dev>
 -- SPDX-License-Identifier: AGPL-3.0-only
 -- name: CreateDoc :exec
 INSERT INTO docs (id, workspace_id, path, title, content_hash, created_by)
