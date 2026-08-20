@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package server
 
@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 )
 
 // TestRoleEnforcement: un viewer puede leer pero las mutaciones dan 403.

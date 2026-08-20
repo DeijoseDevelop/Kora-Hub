@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package indexer
 
@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/db"
-	"github.com/zekrost/hub/internal/docs"
-	"github.com/zekrost/hub/internal/search"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/search"
 )
 
 func setup(t *testing.T) (*Indexer, *db.Queries, *docs.Store) {

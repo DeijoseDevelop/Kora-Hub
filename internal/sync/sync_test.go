@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package sync
 
@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/db"
-	"github.com/zekrost/hub/internal/docs"
-	"github.com/zekrost/hub/internal/indexer"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
 )
 
 func setup(t *testing.T) (*Engine, *db.Queries, *sql.DB, string, string) {

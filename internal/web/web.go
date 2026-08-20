@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Package web embebe el frontend Nix.js compilado (ADR-04: un solo
 // artefacto). El directorio dist/ se genera con `make build-frontend`

@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Cliente de la API REST v1 (P4: la UI es un cliente más).
 // El token se guarda en localStorage; cada petición lleva Bearer.

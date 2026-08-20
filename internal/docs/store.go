@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Package docs implementa el CRUD de documentos sobre el filesystem
 // canónico (P1): los archivos Markdown son la única fuente de verdad;

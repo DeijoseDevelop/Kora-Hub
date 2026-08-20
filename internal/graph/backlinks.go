@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Package graph extrae los backlinks entre documentos (sintaxis
 // [[dobles corchetes]]) que alimentan el grafo de relaciones.

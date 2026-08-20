@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Command hub es el punto de arranque del binario único: config, base
 // de datos, migraciones y HTTP (P3). Un solo artefacto, cero
@@ -15,13 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zekrost/hub/internal/auth"
-	"github.com/zekrost/hub/internal/config"
-	"github.com/zekrost/hub/internal/db"
-	"github.com/zekrost/hub/internal/docs"
-	"github.com/zekrost/hub/internal/indexer"
-	"github.com/zekrost/hub/internal/server"
-	"github.com/zekrost/hub/internal/web"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/config"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/server"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/web"
 )
 
 func main() {

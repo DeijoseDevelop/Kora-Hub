@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/auth"
-	"github.com/zekrost/hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 )
 
 func registerUser(t *testing.T, srv *Server) (string, map[string]any) {

@@ -127,7 +127,7 @@ type ListTasksByWorkspaceParams struct {
 	Done        int64  `json:"done"`
 }
 
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 func (q *Queries) ListTasksByWorkspace(ctx context.Context, arg ListTasksByWorkspaceParams) ([]Task, error) {
 	rows, err := q.db.QueryContext(ctx, listTasksByWorkspace, arg.WorkspaceID, arg.Done)

@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Package search expone la búsqueda full-text FTS5 (sección 4.2).
 // Se implementa con SQL directo: sqlc no conoce las tablas virtuales

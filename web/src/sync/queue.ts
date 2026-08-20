@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 import Dexie, { type Table } from "dexie";
 
@@ -18,7 +18,7 @@ class HubQueueDB extends Dexie {
   commands!: Table<QueuedCommand, number>;
 
   constructor() {
-    super("zekrost-hub");
+    super("kora-hub");
     this.version(1).stores({
       commands: "++id, idempotencyKey, createdAt",
     });

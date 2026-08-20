@@ -9,9 +9,9 @@ Write in Markdown. Keep your tasks *inside* your documents. Kora Hub turns them 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![Nix.js](https://img.shields.io/badge/Nix.js-2.6-7c6cf0)](https://nix-js.dev)
-[![CI](https://img.shields.io/badge/CI-passing-3fb950?logo=githubactions&logoColor=white)](https://github.com/Zekrost/Zekrost-Hub/actions)
+[![CI](https://img.shields.io/badge/CI-passing-3fb950?logo=githubactions&logoColor=white)](https://github.com/DeijoseDevelop/Kora-Hub/actions)
 
-[Website](https://zekrost.dev) · [Architecture](docs/ARCHITECTURE.md) · [Report a bug](https://github.com/Zekrost/Zekrost-Hub/issues)
+[Website](https://zekrost.dev) · [Architecture](docs/ARCHITECTURE.md) · [Report a bug](https://github.com/DeijoseDevelop/Kora-Hub/issues)
 
 </div>
 
@@ -28,8 +28,8 @@ A single, lightweight binary that replaces the usual pile of tools — a wiki he
 ```markdown
 # Feature: live tracking
 
-- [ ] Design the task parser data model #2026-08-20 @zekrost !alta ~deiver
-- [x] Implement embedded task parsing #2026-08-14 @zekrost !alta
+- [ ] Design the task parser data model #2026-08-20 @deijose !alta ~deiver
+- [x] Implement embedded task parsing #2026-08-14 @deijose !alta
 ```
 
 That file *is* your project board. Complete a task in the kanban and it marks the checkbox in the document — same entity, two views.
@@ -66,7 +66,7 @@ docker run -d \
   -v hub-data:/data \
   -p 8080:8080 \
   -e HUB_JWT_SECRET=<your-secret> \
-  ghcr.io/zekrost/kora-hub:latest
+  ghcr.io/deijosedevelop/kora-hub:latest
 ```
 
 Open [http://localhost:8080](http://localhost:8080).
@@ -103,7 +103,7 @@ Instalables por plataforma (GitHub Releases):
 | Windows | `.msi` e instalador `.exe` (NSIS) |
 | macOS | `.dmg` (Intel y Apple Silicon) |
 
-> Sin firma por ahora: Windows SmartScreen y macOS Gatekeeper mostrarán una advertencia en la primera ejecución (habitual en open source). Datos en `~/.local/share/dev.zekrost.hub/` (Linux), `~/Library/Application Support/dev.zekrost.hub/` (macOS) o `%APPDATA%\dev.zekrost.hub\` (Windows).
+> Sin firma por ahora: Windows SmartScreen y macOS Gatekeeper mostrarán una advertencia en la primera ejecución (habitual en open source). Datos en `~/.local/share/dev.kora.hub/` (Linux), `~/Library/Application Support/dev.kora.hub/` (macOS) o `%APPDATA%\dev.kora.hub\` (Windows).
 
 ### Desarrollo local de la app de escritorio
 
@@ -123,8 +123,8 @@ make desktop-build   # genera los instalables en desktop/src-tauri/target/releas
 Requirements: [Go 1.26+](https://go.dev/dl), [Node.js 22+](https://nodejs.org), [sqlc](https://sqlc.dev) v1.31.
 
 ```bash
-git clone git@github.com:Zekrost/Zekrost-Hub.git
-cd Zekrost-Hub
+git clone git@github.com:DeijoseDevelop/Kora-Hub.git
+cd Kora-Hub
 
 make frontend   # build the Nix.js frontend and embed it
 make generate   # regenerate sqlc code
@@ -187,7 +187,7 @@ curl -X POST localhost:8080/api/v1/auth/register \
 # Quick Add Magic
 curl -X POST localhost:8080/api/v1/tasks \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"text":"review invoices #tomorrow @zekrost !high"}'
+  -d '{"text":"review invoices #tomorrow @deijose !high"}'
 
 # Views are projections of the index
 curl "localhost:8080/api/v1/tasks?vista=calendar&desde=2026-09-01&hasta=2026-09-30" \
@@ -201,7 +201,7 @@ Full endpoint reference is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Contributing
 
-Issues, ideas and pull requests are welcome. We dogfood the product — Zekrost and BikerOS are managed with Kora Hub.
+Issues, ideas and pull requests are welcome. We dogfood the product — Deijose and BikerOS are managed with Kora Hub.
 
 Before submitting a PR, please open an issue or comment on an existing one so the approach is agreed on before code is written.
 
@@ -213,4 +213,4 @@ The self-hosted product is free and complete. Paid offerings (encrypted sync ser
 
 ---
 
-<p align="center">Built by <a href="https://github.com/Zekrost">Zekrost</a> — dogfooding our own product since day one.</p>
+<p align="center">Built by <a href="https://github.com/DeijoseDevelop">Deijose</a> — dogfooding our own product since day one.</p>

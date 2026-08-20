@@ -11,14 +11,14 @@ import (
 type Querier interface {
 	AddMembership(ctx context.Context, arg AddMembershipParams) error
 	CountUsers(ctx context.Context) (int64, error)
-	// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateDoc(ctx context.Context, arg CreateDocParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
-	// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateUser(ctx context.Context, arg CreateUserParams) error
-	// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) error
 	DeleteExpiredRefreshTokens(ctx context.Context) error
@@ -33,10 +33,10 @@ type Querier interface {
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
-	// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	GetWorkspaceByID(ctx context.Context, id string) (Workspace, error)
-	// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	// Sync delta (seccion 9): cursor monotono por workspace + push con
 	// deduplicacion por idempotency-key.
@@ -49,7 +49,7 @@ type Querier interface {
 	ListDocsForGraph(ctx context.Context, workspaceID string) ([]ListDocsForGraphRow, error)
 	ListTasksByDateRange(ctx context.Context, arg ListTasksByDateRangeParams) ([]Task, error)
 	ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]Task, error)
-	// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	ListTasksByWorkspace(ctx context.Context, arg ListTasksByWorkspaceParams) ([]Task, error)
 	ListTasksDueToday(ctx context.Context, arg ListTasksDueTodayParams) ([]Task, error)

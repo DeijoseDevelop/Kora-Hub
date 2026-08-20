@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package server
 
@@ -15,11 +15,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/auth"
-	"github.com/zekrost/hub/internal/config"
-	"github.com/zekrost/hub/internal/db"
-	"github.com/zekrost/hub/internal/docs"
-	"github.com/zekrost/hub/internal/indexer"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/config"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
 )
 
 func testServer(t *testing.T) (*Server, string) {

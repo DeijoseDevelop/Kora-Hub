@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 import { persistPlugin, type NixPlugin } from "@deijose/nix-js";
 import { platformStorage } from "../platform/storage";

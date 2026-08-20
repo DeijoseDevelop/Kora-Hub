@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Capa de plataforma (sección 7.3): una interfaz decide la
 // implementación según el entorno. Ningún módulo de negocio conoce la

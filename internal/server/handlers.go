@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package server
 
@@ -12,10 +12,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/auth"
-	"github.com/zekrost/hub/internal/db"
-	"github.com/zekrost/hub/internal/search"
-	"github.com/zekrost/hub/internal/tasks"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/search"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/tasks"
 )
 
 // -------------------------------- Auth --------------------------------

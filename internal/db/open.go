@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package db
 
@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zekrost/hub/db"
+	"github.com/DeijoseDevelop/Kora-Hub/db"
 	_ "modernc.org/sqlite"
 )
 

@@ -1,4 +1,4 @@
-module github.com/zekrost/hub
+module github.com/DeijoseDevelop/Kora-Hub
 
 go 1.26
 

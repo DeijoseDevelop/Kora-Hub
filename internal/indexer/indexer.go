@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Package indexer sincroniza el filesystem canónico con el índice
 // SQLite (P1): recorre los archivos Markdown, regenera los índices de
@@ -15,10 +15,10 @@ import (
 	"strings"
 
 	"github.com/oklog/ulid/v2"
-	"github.com/zekrost/hub/internal/db"
-	"github.com/zekrost/hub/internal/docs"
-	"github.com/zekrost/hub/internal/graph"
-	"github.com/zekrost/hub/internal/tasks"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/graph"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/tasks"
 )
 
 // Indexer reindexa un workspace desde su árbol canónico.

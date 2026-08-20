@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 package server
 
@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/zekrost/hub/internal/sync"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/sync"
 )
 
 // GET /sync/changes?since=<cursor> — delta de cambios (sección 9.1).

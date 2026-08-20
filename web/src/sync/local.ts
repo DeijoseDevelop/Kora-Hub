@@ -49,7 +49,7 @@ class HubLocalDB extends Dexie {
   meta!: Table<Meta, string>;
 
   constructor() {
-    super("zekrost-hub-local");
+    super("kora-hub-local");
     this.version(1).stores({
       docs: "id, path, updatedAt",
       meta: "key",

@@ -37,7 +37,7 @@ type CreateWorkspaceParams struct {
 	OwnerID string `json:"owner_id"`
 }
 
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) error {
 	_, err := q.db.ExecContext(ctx, createWorkspace,

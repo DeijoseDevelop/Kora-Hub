@@ -1,4 +1,4 @@
-// Copyright (C) 2026 Zekrost <tech@zekrost.com>
+// Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 // Package auth implementa autenticación JWT stateless con refresh
 // rotativo (ADR-07) y contraseñas bcrypt. Access token de 15 minutos;
