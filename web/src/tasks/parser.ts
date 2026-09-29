@@ -4,10 +4,13 @@
 //	tarea := checkbox WS texto (WS metadato)*
 //	checkbox := '- [ ]' | '- [x]' | '- [~]'      -- ~ = en progreso
 //	metadato := fecha | proyecto | prioridad | asignado | etiqueta
+//	          | recurrencia | identificador | dependencia
 //	fecha := '#' (AAAA-MM-DD | 'hoy' | 'mañana' | 'lun'..'dom')
 //	proyecto := '@' ident   prioridad := '!' (baja|media|alta|1..3)
 //	asignado := '~' ident   etiqueta := '+' ident
-//	ident := [a-z0-9-]+
+//	recurrencia := '*' 'every:' [1-9][0-9]*(d|w|m|y)
+//	identificador := '^id:' ident   dependencia := '^blocked-by:' ident
+//	ident := [a-z0-9-]+   -- cualquier valor admite "comillas"
 //
 // Invariantes: idempotente, tolerante y round-trip garantizado (la
 // edición desde una vista reescribe la línea preservando el resto).
@@ -23,6 +26,9 @@ export interface ParsedTask {
   priority: string | null; // baja | media | alta
   assignee: string | null;
   tags: string[];
+  recur: string | null;    // *every:<intervalo> (sección 6.5)
+  taskUid: string | null;  // ^id: identidad estable opcional
+  blockedBy: string | null; // ^blocked-by: referencia a otro ^id
 }
 
 export function parseLine(line: string): ParsedTask | null {
@@ -44,22 +50,31 @@ export function parseLine(line: string): ParsedTask | null {
     priority: null,
     assignee: null,
     tags: [],
+    recur: null,
+    taskUid: null,
+    blockedBy: null,
   };
 
   const textParts: string[] = [];
-  for (const p of rest.split(/\s+/)) {
+  for (const p of splitMeta(rest)) {
     if (p.startsWith("#")) {
       const d = resolveDateISO(p.slice(1));
       if (d) t.dueDate = d;
       else textParts.push(p);
-    } else if (p.startsWith("@") && isIdent(p.slice(1))) {
-      t.project = p.slice(1);
-    } else if (p.startsWith("!") && isPriority(p.slice(1))) {
-      t.priority = normalizePriority(p.slice(1));
-    } else if (p.startsWith("~") && isIdent(p.slice(1))) {
-      t.assignee = p.slice(1);
-    } else if (p.startsWith("+") && isIdent(p.slice(1))) {
-      t.tags.push(p.slice(1));
+    } else if (p.startsWith("*every:") && isRecurInterval(p.slice(7))) {
+      t.recur = p.slice(7);
+    } else if (p.startsWith("^id:") && isIdentValue(p.slice(4))) {
+      t.taskUid = unquote(p.slice(4));
+    } else if (p.startsWith("^blocked-by:") && isIdentValue(p.slice(12))) {
+      t.blockedBy = unquote(p.slice(12));
+    } else if (p.startsWith("@") && isIdentValue(p.slice(1))) {
+      t.project = unquote(p.slice(1));
+    } else if (p.startsWith("!") && isPriority(unquote(p.slice(1)))) {
+      t.priority = normalizePriority(unquote(p.slice(1)));
+    } else if (p.startsWith("~") && isIdentValue(p.slice(1))) {
+      t.assignee = unquote(p.slice(1));
+    } else if (p.startsWith("+") && isIdentValue(p.slice(1))) {
+      t.tags.push(unquote(p.slice(1)));
     } else {
       textParts.push(p); // tolerante: metadatos desconocidos se conservan
     }
@@ -134,6 +149,78 @@ export function applyTaskState(content: string, task: ParsedTask, done: boolean)
 
 function isIdent(s: string): boolean {
   return /^[a-z0-9-]+$/.test(s);
+}
+
+// splitMeta trocea en espacios respetando valores "entre comillas"
+// (sección 6.5). Las comillas se conservan en el token; unquote las
+// retira al extraer el valor.
+function splitMeta(s: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (const c of s) {
+    if (c === '"') {
+      inQ = !inQ;
+      cur += c;
+    } else if ((c === " " || c === "\t") && !inQ) {
+      if (cur) out.push(cur);
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+function unquote(s: string): string {
+  return s.length >= 2 && s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s;
+}
+
+// isIdentValue acepta ident plano o cualquier valor entre comillas no
+// vacío (permite espacios: @"proyecto largo").
+function isIdentValue(s: string): boolean {
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) return s.length > 2;
+  return isIdent(s);
+}
+
+// isRecurInterval valida *every: [1-9][0-9]*(d|w|m|y).
+function isRecurInterval(s: string): boolean {
+  return /^[1-9][0-9]*[dwmy]$/.test(s);
+}
+
+// nextOccurrence calcula la siguiente fecha de una tarea recurrente
+// sumando el intervalo a la fecha base.
+export function nextOccurrence(dueDate: string, recur: string): string | null {
+  if (!/^[1-9][0-9]*[dwmy]$/.test(recur)) return null;
+  const base = new Date(dueDate + "T12:00:00");
+  if (isNaN(base.getTime())) return null;
+  const n = parseInt(recur.slice(0, -1), 10);
+  const unit = recur[recur.length - 1];
+  const d = new Date(base);
+  if (unit === "d") d.setDate(d.getDate() + n);
+  else if (unit === "w") d.setDate(d.getDate() + 7 * n);
+  else if (unit === "m") d.setMonth(d.getMonth() + n);
+  else d.setFullYear(d.getFullYear() + n);
+  const iso = (x: Date) =>
+    `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+  return iso(d);
+}
+
+// spawnRecurring construye la línea de la siguiente ocurrencia: misma
+// tarea reabierta con la fecha recalculada; ^id/^blocked-by no se heredan.
+export function spawnRecurring(rawLine: string, nextDate: string): string {
+  const fields = rawLine.split(/\s+/);
+  const out: string[] = ["- [ ]"];
+  // el checkbox ocupa 2 tokens ([x]/[~]) o 3 ([ ] — el espacio parte)
+  const is2 = fields.length >= 2 && fields[0] === "-" && /^\[[ x~]\]$/i.test(fields[1]);
+  const rest = fields.slice(is2 ? 2 : 3);
+  for (const p of rest) {
+    if (p.startsWith("#")) out.push("#" + nextDate);
+    else if (p.startsWith("^id:") || p.startsWith("^blocked-by:")) continue;
+    else out.push(p);
+  }
+  return out.join(" ");
 }
 
 function isPriority(s: string): boolean {

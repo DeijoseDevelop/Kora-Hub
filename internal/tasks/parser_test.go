@@ -9,12 +9,12 @@ import (
 
 func TestParseLineBasic(t *testing.T) {
 	tests := []struct {
-		name    string
-		line    string
-		wantOK  bool
-		done    bool
-		inProg  bool
-		text    string
+		name   string
+		line   string
+		wantOK bool
+		done   bool
+		inProg bool
+		text   string
 	}{
 		{"abierta", "- [ ] Preparar propuesta", true, false, false, "Preparar propuesta"},
 		{"hecha", "- [x] Enviar informe", true, true, false, "Enviar informe"},
@@ -40,6 +40,93 @@ func TestParseLineBasic(t *testing.T) {
 				t.Fatalf("text = %q, want %q", got.Text, tt.text)
 			}
 		})
+	}
+}
+
+// TestParseLineV2 cubre la extension de gramatica aprobada (seccion
+// 6.5): recurrencia, identidad, dependencias y valores con comillas.
+func TestParseLineV2(t *testing.T) {
+	tests := []struct {
+		name      string
+		line      string
+		recur     string
+		uid       string
+		blockedBy string
+		project   string
+		assignee  string
+		text      string
+	}{
+		{
+			"recurrencia semanal",
+			"- [ ] Backup semanal #2026-10-05 *every:1w",
+			"1w", "", "", "", "", "Backup semanal",
+		},
+		{
+			"identidad y dependencia",
+			"- [ ] Desplegar release ^id:deploy-1 ^blocked-by:qa-review",
+			"", "deploy-1", "qa-review", "", "", "Desplegar release",
+		},
+		{
+			"valores con comillas",
+			`- [ ] Plan @"kora hub" ~"Jane Doe" +"tag con espacio"`,
+			"", "", "", "kora hub", "Jane Doe", "Plan",
+		},
+		{
+			"intervalo invalido se conserva como texto",
+			"- [ ] Revisar *every:0d",
+			"", "", "", "", "", "Revisar *every:0d",
+		},
+		{
+			"uid invalido se conserva como texto",
+			"- [ ] Revisar ^id:Mayuscula",
+			"", "", "", "", "", "Revisar ^id:Mayuscula",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task, ok := ParseLine(tt.line)
+			if !ok {
+				t.Fatalf("ParseLine(%q) no parseo", tt.line)
+			}
+			if task.Recur != tt.recur {
+				t.Errorf("recur = %q, want %q", task.Recur, tt.recur)
+			}
+			if task.TaskUID != tt.uid {
+				t.Errorf("task_uid = %q, want %q", task.TaskUID, tt.uid)
+			}
+			if task.BlockedBy != tt.blockedBy {
+				t.Errorf("blocked_by = %q, want %q", task.BlockedBy, tt.blockedBy)
+			}
+			if task.Project != tt.project {
+				t.Errorf("project = %q, want %q", task.Project, tt.project)
+			}
+			if task.Assignee != tt.assignee {
+				t.Errorf("assignee = %q, want %q", task.Assignee, tt.assignee)
+			}
+			if task.Text != tt.text {
+				t.Errorf("text = %q, want %q", task.Text, tt.text)
+			}
+		})
+	}
+}
+
+func TestRecurSpawn(t *testing.T) {
+	if got := NextOccurrence("2026-10-05", "2w"); got != "2026-10-19" {
+		t.Fatalf("NextOccurrence 2w = %q", got)
+	}
+	if got := NextOccurrence("2026-01-31", "1m"); got != "2026-03-03" && got != "2026-02-28" {
+		// Go AddDate desborda 31-ene -> 3-mar; el valor exacto es
+		// implementacion, pero nunca debe fallar
+		t.Fatalf("NextOccurrence 1m = %q", got)
+	}
+	if got := NextOccurrence("2026-10-05", "x9"); got != "" {
+		t.Fatalf("intervalo invalido = %q", got)
+	}
+	line := "- [x] Backup semanal #2026-10-05 *every:1w ~deiver ^id:bak-1 ^blocked-by:otro"
+	got := SpawnRecurring(line, "2026-10-12")
+	want := "- [ ] Backup semanal #2026-10-12 *every:1w ~deiver"
+	if got != want {
+		t.Fatalf("SpawnRecurring = %q, want %q", got, want)
 	}
 }
 

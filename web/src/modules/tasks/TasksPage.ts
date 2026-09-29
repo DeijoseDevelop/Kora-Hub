@@ -163,11 +163,23 @@ async function quickAdd(): Promise<void> {
   }
 }
 
+// isBlocked resuelve la dependencia ^blocked-by: contra el mirror
+// local: la tarea esta bloqueada si su bloqueante existe y no esta hecha.
+function isBlocked(t: LocalTask): boolean {
+  if (!t.blockedBy) return false;
+  const blocker = localTasks.value.find(
+    (x) => x.workspaceId === t.workspaceId && x.taskUid === t.blockedBy,
+  );
+  return blocker != null && !blocker.done;
+}
+
 function taskBadges(t: LocalTask): NixTemplate {
   return html`
     ${t.dueDate
       ? html`<span class=${"badge" + " date" + (isOverdue(t.dueDate) ? " overdue" : "")}>${formatDate(t.dueDate)}</span>`
       : ""}
+    ${t.recur ? html`<span class="badge recur" title="Recurrente">↻ ${t.recur}</span>` : ""}
+    ${isBlocked(t) ? html`<span class="badge blocked" title=${"Bloqueada por ^id:" + t.blockedBy}>bloqueada</span>` : ""}
     ${t.project ? html`<span class="badge project">${"@" + t.project}</span>` : ""}
     ${t.priority ? html`<span class=${"badge priority-" + t.priority}>${t.priority}</span>` : ""}
   `;

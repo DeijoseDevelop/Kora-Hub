@@ -19,8 +19,43 @@ func (q *Queries) DeleteTasksForDoc(ctx context.Context, docID string) error {
 	return err
 }
 
+const getTaskByUID = `-- name: GetTaskByUID :one
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
+WHERE workspace_id = ? AND task_uid = ? AND task_uid != ''
+LIMIT 1
+`
+
+type GetTaskByUIDParams struct {
+	WorkspaceID string `json:"workspace_id"`
+	TaskUid     string `json:"task_uid"`
+}
+
+func (q *Queries) GetTaskByUID(ctx context.Context, arg GetTaskByUIDParams) (Task, error) {
+	row := q.db.QueryRowContext(ctx, getTaskByUID, arg.WorkspaceID, arg.TaskUid)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.DocID,
+		&i.LineNo,
+		&i.Title,
+		&i.DueDate,
+		&i.Project,
+		&i.Priority,
+		&i.Assignee,
+		&i.Done,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.InProgress,
+		&i.TaskUid,
+		&i.Recur,
+		&i.BlockedBy,
+	)
+	return i, err
+}
+
 const listTasksByDateRange = `-- name: ListTasksByDateRange :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ? AND due_date >= ? AND due_date <= ?
 ORDER BY due_date ASC, done ASC
 `
@@ -54,6 +89,9 @@ func (q *Queries) ListTasksByDateRange(ctx context.Context, arg ListTasksByDateR
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -69,7 +107,7 @@ func (q *Queries) ListTasksByDateRange(ctx context.Context, arg ListTasksByDateR
 }
 
 const listTasksByProject = `-- name: ListTasksByProject :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ? AND project = ?
 ORDER BY due_date ASC
 `
@@ -102,6 +140,9 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -117,7 +158,7 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 }
 
 const listTasksByWorkspace = `-- name: ListTasksByWorkspace :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ? AND done = ?
 ORDER BY done ASC, in_progress DESC, due_date ASC
 `
@@ -152,6 +193,9 @@ func (q *Queries) ListTasksByWorkspace(ctx context.Context, arg ListTasksByWorks
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -167,7 +211,7 @@ func (q *Queries) ListTasksByWorkspace(ctx context.Context, arg ListTasksByWorks
 }
 
 const listTasksDueToday = `-- name: ListTasksDueToday :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ? AND assignee = ?
   AND due_date <= date('now') AND done = 0
 ORDER BY due_date ASC
@@ -201,6 +245,9 @@ func (q *Queries) ListTasksDueToday(ctx context.Context, arg ListTasksDueTodayPa
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -216,7 +263,7 @@ func (q *Queries) ListTasksDueToday(ctx context.Context, arg ListTasksDueTodayPa
 }
 
 const listTasksMineToday = `-- name: ListTasksMineToday :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ? AND assignee = ? AND due_date <= date('now') AND done = 0
 ORDER BY due_date ASC
 `
@@ -249,6 +296,9 @@ func (q *Queries) ListTasksMineToday(ctx context.Context, arg ListTasksMineToday
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -264,7 +314,7 @@ func (q *Queries) ListTasksMineToday(ctx context.Context, arg ListTasksMineToday
 }
 
 const listTasksPage = `-- name: ListTasksPage :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ? AND done = ?
   AND (id > ?)
 ORDER BY id ASC
@@ -306,6 +356,9 @@ func (q *Queries) ListTasksPage(ctx context.Context, arg ListTasksPageParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -321,7 +374,7 @@ func (q *Queries) ListTasksPage(ctx context.Context, arg ListTasksPageParams) ([
 }
 
 const searchTasksByTitle = `-- name: SearchTasksByTitle :many
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE workspace_id = ?1 AND title LIKE '%' || ?2 || '%'
 ORDER BY due_date ASC
 LIMIT ?3
@@ -356,6 +409,9 @@ func (q *Queries) SearchTasksByTitle(ctx context.Context, arg SearchTasksByTitle
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.InProgress,
+			&i.TaskUid,
+			&i.Recur,
+			&i.BlockedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -388,8 +444,9 @@ func (q *Queries) SetTaskDone(ctx context.Context, arg SetTaskDoneParams) error 
 
 const upsertTask = `-- name: UpsertTask :exec
 INSERT INTO tasks (id, workspace_id, doc_id, line_no, title, due_date,
-                   project, priority, assignee, done, in_progress)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   project, priority, assignee, done, in_progress,
+                   task_uid, recur, blocked_by)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (doc_id, line_no) DO UPDATE SET
     title = excluded.title,
     due_date = excluded.due_date,
@@ -398,6 +455,9 @@ ON CONFLICT (doc_id, line_no) DO UPDATE SET
     assignee = excluded.assignee,
     done = excluded.done,
     in_progress = excluded.in_progress,
+    task_uid = excluded.task_uid,
+    recur = excluded.recur,
+    blocked_by = excluded.blocked_by,
     updated_at = datetime('now')
 `
 
@@ -413,6 +473,9 @@ type UpsertTaskParams struct {
 	Assignee    sql.NullString `json:"assignee"`
 	Done        int64          `json:"done"`
 	InProgress  int64          `json:"in_progress"`
+	TaskUid     string         `json:"task_uid"`
+	Recur       string         `json:"recur"`
+	BlockedBy   string         `json:"blocked_by"`
 }
 
 func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) error {
@@ -428,6 +491,9 @@ func (q *Queries) UpsertTask(ctx context.Context, arg UpsertTaskParams) error {
 		arg.Assignee,
 		arg.Done,
 		arg.InProgress,
+		arg.TaskUid,
+		arg.Recur,
+		arg.BlockedBy,
 	)
 	return err
 }

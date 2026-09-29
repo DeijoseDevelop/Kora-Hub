@@ -9,12 +9,13 @@
 //	tarea := checkbox WS texto (WS metadato)*
 //	checkbox := '- [ ]' | '- [x]' | '- [~]'      -- ~ = en progreso
 //	metadato := fecha | proyecto | prioridad | asignado | etiqueta
+//	          | recurrencia | identificador | dependencia
 //	fecha := '#' (AAAA-MM-DD | 'hoy' | 'mañana' | 'lun'..'dom')
-//	proyecto := '@' ident
-//	prioridad := '!' ('baja'|'media'|'alta'|'1'..'3')
-//	asignado := '~' ident
-//	etiqueta := '+' ident
-//	ident := [a-z0-9-]+
+//	proyecto := '@' ident          prioridad := '!' (baja|media|alta|1..3)
+//	asignado := '~' ident          etiqueta := '+' ident
+//	recurrencia := '*' 'every:' [1-9][0-9]* ('d'|'w'|'m'|'y')
+//	identificador := '^id:' ident  dependencia := '^blocked-by:' ident
+//	ident := [a-z0-9-]+            -- cualquier valor admite "comillas"
 //
 // Invariantes: idempotente, tolerante y con round-trip garantizado:
 // toda edición desde una vista reescribe la línea original preservando
@@ -22,6 +23,7 @@
 package tasks
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -36,16 +38,19 @@ const (
 // Task es la representación parseada de una línea de checkbox.
 // RawLine conserva la línea original para garantizar el round-trip.
 type Task struct {
-	Line      int      `json:"line_no"` // 1-based dentro del documento
-	RawLine   string   `json:"-"`
-	Text      string   `json:"title"`
-	Done      bool     `json:"done"`
-	InProgress bool    `json:"in_progress"`
-	DueDate   string   `json:"due_date"` // AAAA-MM-DD
-	Project   string   `json:"project"`
-	Priority  string   `json:"priority"` // baja | media | alta
-	Assignee  string   `json:"assignee"`
-	Tags      []string `json:"tags"`
+	Line       int      `json:"line_no"` // 1-based dentro del documento
+	RawLine    string   `json:"-"`
+	Text       string   `json:"title"`
+	Done       bool     `json:"done"`
+	InProgress bool     `json:"in_progress"`
+	DueDate    string   `json:"due_date"` // AAAA-MM-DD
+	Project    string   `json:"project"`
+	Priority   string   `json:"priority"` // baja | media | alta
+	Assignee   string   `json:"assignee"`
+	Tags       []string `json:"tags"`
+	Recur      string   `json:"recur"`      // *every:<intervalo> (sección 6.5)
+	TaskUID    string   `json:"task_uid"`   // ^id: identidad estable opcional
+	BlockedBy  string   `json:"blocked_by"` // ^blocked-by: referencia a otro ^id
 }
 
 // ParseLine intenta parsear una línea de documento como tarea embebida.
@@ -61,26 +66,32 @@ func ParseLine(line string) (Task, bool) {
 	}
 
 	t := Task{
-		RawLine: trimmed,
-		Done:    state == StateDone,
+		RawLine:    trimmed,
+		Done:       state == StateDone,
 		InProgress: state == StateProgress,
 	}
 
-	// texto + metadatos: separados por espacios simples
-	parts := strings.Fields(rest)
+	// texto + metadatos: separados por espacios, respetando "comillas"
+	parts := splitMeta(rest)
 	textParts := make([]string, 0, len(parts))
 	for _, p := range parts {
 		switch {
 		case strings.HasPrefix(p, "#"):
 			t.DueDate = parseDate(p[1:])
-		case strings.HasPrefix(p, "@") && isIdent(p[1:]):
-			t.Project = p[1:]
-		case strings.HasPrefix(p, "!") && isPriority(p[1:]):
-			t.Priority = normalizePriority(p[1:])
-		case strings.HasPrefix(p, "~") && isIdent(p[1:]):
-			t.Assignee = p[1:]
-		case strings.HasPrefix(p, "+") && isIdent(p[1:]):
-			t.Tags = append(t.Tags, p[1:])
+		case strings.HasPrefix(p, "*every:") && isRecurInterval(p[7:]):
+			t.Recur = p[7:]
+		case strings.HasPrefix(p, "^id:") && isIdentValue(p[4:]):
+			t.TaskUID = unquote(p[4:])
+		case strings.HasPrefix(p, "^blocked-by:") && isIdentValue(p[12:]):
+			t.BlockedBy = unquote(p[12:])
+		case strings.HasPrefix(p, "@") && isIdentValue(p[1:]):
+			t.Project = unquote(p[1:])
+		case strings.HasPrefix(p, "!") && isPriority(unquote(p[1:])):
+			t.Priority = normalizePriority(unquote(p[1:]))
+		case strings.HasPrefix(p, "~") && isIdentValue(p[1:]):
+			t.Assignee = unquote(p[1:])
+		case strings.HasPrefix(p, "+") && isIdentValue(p[1:]):
+			t.Tags = append(t.Tags, unquote(p[1:]))
 		default:
 			// tolerante: metadatos desconocidos se conservan como texto
 			textParts = append(textParts, p)
@@ -197,6 +208,126 @@ func isIdent(s string) bool {
 		}
 	}
 	return true
+}
+
+// splitMeta trocea en espacios respetando valores "entre comillas"
+// (sección 6.5: cualquier valor de metadato admite comillas dobles).
+// Las comillas se conservan en el token para el round-trip; unquote
+// las retira al extraer el valor.
+func splitMeta(s string) []string {
+	var out []string
+	var cur strings.Builder
+	inQ := false
+	for _, c := range s {
+		switch {
+		case c == '"':
+			inQ = !inQ
+			cur.WriteRune(c)
+		case (c == ' ' || c == '\t') && !inQ:
+			if cur.Len() > 0 {
+				out = append(out, cur.String())
+				cur.Reset()
+			}
+		default:
+			cur.WriteRune(c)
+		}
+	}
+	if cur.Len() > 0 {
+		out = append(out, cur.String())
+	}
+	return out
+}
+
+// unquote retira las comillas dobles que envuelven un valor.
+func unquote(s string) string {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+// isIdentValue acepta ident plano ([a-z0-9-]+) o cualquier valor entre
+// comillas no vacío (permite espacios: @"proyecto largo").
+func isIdentValue(s string) bool {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return len(s) > 2
+	}
+	return isIdent(s)
+}
+
+// isRecurInterval valida el intervalo de *every: [1-9][0-9]*(d|w|m|y).
+func isRecurInterval(s string) bool {
+	if len(s) < 2 {
+		return false
+	}
+	unit := s[len(s)-1]
+	if unit != 'd' && unit != 'w' && unit != 'm' && unit != 'y' {
+		return false
+	}
+	num := s[:len(s)-1]
+	if num[0] == '0' {
+		return false // sin sentido: every:0d
+	}
+	for _, r := range num {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// SpawnRecurring construye la línea de la siguiente ocurrencia: la
+// misma tarea reabierta ([ ]) con la fecha recalculada. El ^id/ la
+// ^blocked-by no se copian — la nueva ocurrencia es una tarea distinta.
+func SpawnRecurring(rawLine, nextDate string) string {
+	fields := strings.Fields(rawLine)
+	out := []string{"- [ ]"}
+	rest := fields
+	// el checkbox ocupa 2 tokens ([x]/[~]) o 3 ([ ] — el espacio parte)
+	switch {
+	case len(rest) >= 2 && rest[0] == "-" && strings.HasPrefix(rest[1], "[") && strings.HasSuffix(rest[1], "]"):
+		rest = rest[2:]
+	case len(rest) >= 3 && rest[0] == "-" && rest[1] == "[" && strings.HasSuffix(rest[2], "]"):
+		rest = rest[3:]
+	}
+	for _, p := range rest {
+		switch {
+		case strings.HasPrefix(p, "#"):
+			out = append(out, "#"+nextDate)
+		case strings.HasPrefix(p, "^id:"), strings.HasPrefix(p, "^blocked-by:"):
+			// identidad/dependencia no se heredan a la ocurrencia nueva
+		default:
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, " ")
+}
+
+// NextOccurrence calcula la siguiente fecha de una tarea recurrente
+// sumando el intervalo a la fecha base (due_date actual).
+func NextOccurrence(dueDate, recur string) string {
+	if len(recur) < 2 {
+		return ""
+	}
+	base, err := time.Parse("2006-01-02", dueDate)
+	if err != nil {
+		return ""
+	}
+	n, err := strconv.Atoi(recur[:len(recur)-1])
+	if err != nil {
+		return ""
+	}
+	switch recur[len(recur)-1] {
+	case 'd':
+		return base.AddDate(0, 0, n).Format("2006-01-02")
+	case 'w':
+		return base.AddDate(0, 0, 7*n).Format("2006-01-02")
+	case 'm':
+		return base.AddDate(0, n, 0).Format("2006-01-02")
+	case 'y':
+		return base.AddDate(n, 0, 0).Format("2006-01-02")
+	}
+	return ""
 }
 
 func isPriority(s string) bool {

@@ -52,6 +52,7 @@ type Querier interface {
 	GetRefreshTokenByID(ctx context.Context, id string) (RefreshToken, error)
 	GetSavedView(ctx context.Context, arg GetSavedViewParams) (SavedView, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error)
+	GetTaskByUID(ctx context.Context, arg GetTaskByUIDParams) (Task, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>

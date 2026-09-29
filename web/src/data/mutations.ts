@@ -3,7 +3,7 @@ import { enqueue } from "../sync/queue";
 import { pushPending } from "../sync/client";
 import { refreshLocal } from "./store";
 import { activeWs } from "./workspace";
-import { applyTaskState, parse } from "../tasks/parser";
+import { applyTaskState, nextOccurrence, parse, spawnRecurring } from "../tasks/parser";
 
 export function nowUTC(): string {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -71,7 +71,17 @@ export async function toggleTaskLocal(task: LocalTask): Promise<void> {
   const tasks = parse(doc.content);
   const t = tasks.find((p) => p.line === task.lineNo);
   if (!t) return;
-  const content = applyTaskState(doc.content, t, !task.done);
+  let content = applyTaskState(doc.content, t, !task.done);
+  // recurrencia (§6.5): al completar, la siguiente ocurrencia se
+  // inserta como línea nueva debajo — espejo del backend
+  if (!task.done && t.recur && t.dueDate) {
+    const next = nextOccurrence(t.dueDate, t.recur);
+    if (next) {
+      const lines = content.split("\n");
+      lines.splice(t.line, 0, spawnRecurring(t.rawLine, next));
+      content = lines.join("\n");
+    }
+  }
   await saveDocLocal({ id: doc.id, path: doc.path, title: doc.title, content });
 }
 
@@ -110,5 +120,8 @@ export async function quickAddLocal(text: string): Promise<LocalTask | null> {
     assignee: created.assignee,
     done: created.done,
     inProgress: created.inProgress,
+    recur: created.recur,
+    taskUid: created.taskUid,
+    blockedBy: created.blockedBy,
   };
 }

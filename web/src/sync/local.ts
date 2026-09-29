@@ -29,6 +29,9 @@ export interface LocalTask {
   assignee: string | null;
   done: boolean;
   inProgress: boolean;
+  recur: string | null;     // *every: (§6.5)
+  taskUid: string | null;   // ^id:
+  blockedBy: string | null; // ^blocked-by:
 }
 
 export interface LocalBacklink {
@@ -69,6 +72,13 @@ class HubLocalDB extends Dexie {
     this.version(4).stores({
       docs: "id, path, workspaceId, updatedAt, deleted",
       tasks: "id, docId, workspaceId, project, dueDate, done",
+      backlinks: "srcDocId, dstTitle",
+      meta: "key",
+    });
+    // v5: taskUid indexado para resolver dependencias ^blocked-by:
+    this.version(5).stores({
+      docs: "id, path, workspaceId, updatedAt, deleted",
+      tasks: "id, docId, workspaceId, project, dueDate, done, taskUid",
       backlinks: "srcDocId, dstTitle",
       meta: "key",
     });
@@ -178,6 +188,9 @@ export async function reindexDoc(docId: string): Promise<number> {
       assignee: t.assignee,
       done: t.done,
       inProgress: t.inProgress,
+      recur: t.recur,
+      taskUid: t.taskUid,
+      blockedBy: t.blockedBy,
     });
   }
   for (const link of extractBacklinks(doc.content)) {

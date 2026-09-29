@@ -722,6 +722,16 @@ kbd {
   color: var(--green);
 }
 
+.badge.recur {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.badge.blocked {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
 .badge.role {
   background: var(--bg-elevated);
   color: var(--text-dim);

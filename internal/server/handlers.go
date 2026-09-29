@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -670,6 +671,13 @@ func (s *Server) handlePatchTask(c *gin.Context) {
 	if ok {
 		lines[idx] = tasks.RoundTrip(parsed, req.Done,
 			req.DueDate, req.Project, req.Priority, req.Assignee)
+		// recurrencia (§6.5): al completar, la siguiente ocurrencia se
+		// inserta como línea nueva debajo — nunca se reabre la misma
+		if req.Done && parsed.Recur != "" && parsed.DueDate != "" {
+			if next := tasks.NextOccurrence(parsed.DueDate, parsed.Recur); next != "" {
+				lines = slices.Insert(lines, idx+1, tasks.SpawnRecurring(parsed.RawLine, next))
+			}
+		}
 	} else {
 		// drift: reconstruir la línea mínima sin perder el título
 		state := " "

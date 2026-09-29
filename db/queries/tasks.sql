@@ -18,8 +18,9 @@ ORDER BY due_date ASC;
 
 -- name: UpsertTask :exec
 INSERT INTO tasks (id, workspace_id, doc_id, line_no, title, due_date,
-                   project, priority, assignee, done, in_progress)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   project, priority, assignee, done, in_progress,
+                   task_uid, recur, blocked_by)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (doc_id, line_no) DO UPDATE SET
     title = excluded.title,
     due_date = excluded.due_date,
@@ -28,7 +29,15 @@ ON CONFLICT (doc_id, line_no) DO UPDATE SET
     assignee = excluded.assignee,
     done = excluded.done,
     in_progress = excluded.in_progress,
+    task_uid = excluded.task_uid,
+    recur = excluded.recur,
+    blocked_by = excluded.blocked_by,
     updated_at = datetime('now');
+
+-- name: GetTaskByUID :one
+SELECT * FROM tasks
+WHERE workspace_id = ? AND task_uid = ? AND task_uid != ''
+LIMIT 1;
 
 -- name: DeleteTasksForDoc :exec
 DELETE FROM tasks WHERE doc_id = ?;

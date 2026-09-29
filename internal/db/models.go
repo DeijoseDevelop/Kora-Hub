@@ -116,6 +116,9 @@ type Task struct {
 	CreatedAt   string         `json:"created_at"`
 	UpdatedAt   string         `json:"updated_at"`
 	InProgress  int64          `json:"in_progress"`
+	TaskUid     string         `json:"task_uid"`
+	Recur       string         `json:"recur"`
+	BlockedBy   string         `json:"blocked_by"`
 }
 
 type User struct {
