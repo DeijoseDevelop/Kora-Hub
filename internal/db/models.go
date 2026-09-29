@@ -86,6 +86,15 @@ type RefreshToken struct {
 	RevokedAt sql.NullString `json:"revoked_at"`
 }
 
+type SavedView struct {
+	ID          string         `json:"id"`
+	WorkspaceID string         `json:"workspace_id"`
+	Name        string         `json:"name"`
+	Filters     string         `json:"filters"`
+	CreatedBy   sql.NullString `json:"created_by"`
+	CreatedAt   string         `json:"created_at"`
+}
+
 type SyncCommand struct {
 	IdempotencyKey string `json:"idempotency_key"`
 	WorkspaceID    string `json:"workspace_id"`

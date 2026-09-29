@@ -217,6 +217,24 @@ export const attachmentsApi = {
     api<void>(`/attachments/${id}?workspace=${workspace}`, { method: "DELETE" }),
 };
 
+export interface SavedView {
+  id: string;
+  name: string;
+  filters: string; // JSON serializado: {vista, proyecto, done, ...}
+}
+
+export const viewsApi = {
+  list: (workspace: string) =>
+    api<{ views: SavedView[] }>(`/views?workspace=${workspace}`),
+  create: (workspace: string, name: string, filters: Record<string, string>) =>
+    api<{ id: string }>(`/views?workspace=${workspace}`, {
+      method: "POST",
+      body: JSON.stringify({ name, filters }),
+    }),
+  remove: (id: string, workspace: string) =>
+    api<void>(`/views/${id}?workspace=${workspace}`, { method: "DELETE" }),
+};
+
 export const tasksApi = {
   list: (done = false) =>
     api<{ tasks: Task[] }>(`/tasks?done=${done ? 1 : 0}`),

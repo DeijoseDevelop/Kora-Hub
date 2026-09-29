@@ -4,7 +4,8 @@ import { activeWs } from "../../data/workspace";
 import { tasksView } from "../../data/tasks-view";
 import { toggleTaskLocal, quickAddLocal } from "../../data/mutations";
 import { currentRole } from "../../api/role";
-import { formatDate, isOverdue, showToast } from "../../ui/kit";
+import { formatDate, isOverdue, showPrompt, showToast } from "../../ui/kit";
+import { viewsApi, type SavedView } from "../../api/client";
 import type { LocalTask } from "../../sync/local";
 
 // Proyecciones del índice local (kanban/tabla/calendario) — 100% offline.
@@ -15,6 +16,97 @@ const tableParams = signal<[string, string]>(["", "0"]);
 const calRange = signal<[string, string]>(monthRange());
 
 let quickAddText = "";
+
+// ------------------------- Vistas guardadas -------------------------
+// D1: filtros serializados por workspace. Se sirven por API y se
+// cachean en localStorage para que apliquen también offline (aplicar
+// una vista es filtrado client-side sobre el mirror local).
+const savedViews = signal<SavedView[]>([]);
+
+function viewsCacheKey(): string {
+  return `hub:views:${activeWs.value ?? ""}`;
+}
+
+async function loadViews(): Promise<void> {
+  const ws = activeWs.value;
+  if (!ws) return;
+  try {
+    const cached = localStorage.getItem(viewsCacheKey());
+    if (cached) savedViews.value = JSON.parse(cached) as SavedView[];
+  } catch { /* cache corrupta: se ignora */ }
+  try {
+    const res = await viewsApi.list(ws);
+    savedViews.value = res.views;
+    localStorage.setItem(viewsCacheKey(), JSON.stringify(res.views));
+  } catch { /* offline: se queda la copia cacheada */ }
+}
+
+function currentFilters(): Record<string, string> {
+  return {
+    vista: tasksView.value,
+    proyecto: tableParams.value[0],
+    done: tableParams.value[1],
+  };
+}
+
+function applyView(v: SavedView): void {
+  try {
+    const f = JSON.parse(v.filters) as Record<string, string>;
+    if (f.vista === "kanban" || f.vista === "tabla" || f.vista === "calendario") {
+      tasksView.value = f.vista;
+    }
+    tableParams.value = [f.proyecto ?? "", f.done ?? "0"];
+  } catch { /* filters corruptas: no-op */ }
+}
+
+async function saveCurrentView(): Promise<void> {
+  const ws = activeWs.value;
+  const name = await showPrompt("Guardar vista", "Nombre de la vista");
+  if (!ws || !name?.trim()) return;
+  try {
+    await viewsApi.create(ws, name.trim(), currentFilters());
+    await loadViews();
+    showToast("Vista guardada");
+  } catch (e) {
+    showToast((e as Error).message);
+  }
+}
+
+async function removeView(id: string): Promise<void> {
+  const ws = activeWs.value;
+  if (!ws) return;
+  try {
+    await viewsApi.remove(id, ws);
+    await loadViews();
+    showToast("Vista eliminada");
+  } catch (e) {
+    showToast((e as Error).message);
+  }
+}
+
+function viewsBar(): NixTemplate {
+  return html`
+    <div class="views-bar">
+      <select @change=${(ev: Event) => {
+      const v = savedViews.value.find((x) => x.id === (ev.target as HTMLSelectElement).value);
+      if (v) applyView(v);
+      (ev.target as HTMLSelectElement).value = "";
+    }}>
+        <option value="">Vistas guardadas…</option>
+        ${() => savedViews.value.map((v) => html`<option value=${v.id}>${v.name}</option>`)}
+      </select>
+      <button class="btn ghost" @click=${() => void saveCurrentView()}>Guardar vista</button>
+      <select @change=${(ev: Event) => {
+      const id = (ev.target as HTMLSelectElement).value;
+      if (id) void removeView(id);
+      (ev.target as HTMLSelectElement).value = "";
+    }}>
+        <option value="">Eliminar…</option>
+        ${() => savedViews.value.map((v) => html`<option value=${v.id}>${v.name}</option>`)}
+      </select>
+    </div>
+  `;
+}
 
 function monthRange(): [string, string] {
   const now = new Date();
@@ -92,35 +184,35 @@ function kanbanColumn(label: string, dot: string, getter: () => LocalTask[]): Ni
       </div>
       <div class="kanban-col-body" data-done=${dot === "done" ? "1" : "0"}
         @dragover=${(ev: DragEvent) => {
-          ev.preventDefault();
-          ev.dataTransfer!.dropEffect = "move";
-          (ev.currentTarget as HTMLElement).classList.add("drag-over");
-        }}
+      ev.preventDefault();
+      ev.dataTransfer!.dropEffect = "move";
+      (ev.currentTarget as HTMLElement).classList.add("drag-over");
+    }}
         @dragleave=${(ev: DragEvent) => (ev.currentTarget as HTMLElement).classList.remove("drag-over")}
         @drop=${(ev: DragEvent) => {
-          ev.preventDefault();
-          (ev.currentTarget as HTMLElement).classList.remove("drag-over");
-          const id = ev.dataTransfer?.getData("text/plain");
-          const target = localTasks.value.find((t) => t.id === id);
-          if (target) void toggle(target);
-        }}>
+      ev.preventDefault();
+      (ev.currentTarget as HTMLElement).classList.remove("drag-over");
+      const id = ev.dataTransfer?.getData("text/plain");
+      const target = localTasks.value.find((t) => t.id === id);
+      if (target) void toggle(target);
+    }}>
         ${() =>
-          getter().map((t) => html`
+      getter().map((t) => html`
             <div class=${"task-card" + (t.done ? " done" : "")} draggable="true"
               @dragstart=${(ev: DragEvent) => {
-                (ev.currentTarget as HTMLElement).classList.add("dragging");
-                ev.dataTransfer?.setData("text/plain", t.id);
-                ev.dataTransfer!.effectAllowed = "move";
-              }}
+          (ev.currentTarget as HTMLElement).classList.add("dragging");
+          ev.dataTransfer?.setData("text/plain", t.id);
+          ev.dataTransfer!.effectAllowed = "move";
+        }}
               @dragend=${(ev: DragEvent) => (ev.currentTarget as HTMLElement).classList.remove("dragging")}>
               <div class="task-text">${t.title}</div>
               <div class="task-meta">
                 <div class="task-badges">${taskBadges(t)}</div>
                 <span class="source-doc" title="Abrir documento"
                   @click=${(ev: MouseEvent) => {
-                    ev.stopPropagation();
-                    openDoc(t.docId);
-                  }}>
+          ev.stopPropagation();
+          openDoc(t.docId);
+        }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                   Ver
                 </span>
@@ -169,16 +261,16 @@ function tablaView(): NixTemplate {
     <div class="list-toolbar">
       <select value=${() => tableParams.value[0]}
         @change=${(ev: Event) => {
-          tableParams.value = [(ev.target as HTMLSelectElement).value, tableParams.value[1]];
-        }}>
+      tableParams.value = [(ev.target as HTMLSelectElement).value, tableParams.value[1]];
+    }}>
         <option value="">Todos los proyectos</option>
         ${() =>
-          [...new Set(localTasks.value.filter((t) => t.workspaceId === activeWs.value).map((t) => t.project).filter((p): p is string => !!p))].sort().map((p) => html`<option value=${p}>@${p}</option>`)}
+      [...new Set(localTasks.value.filter((t) => t.workspaceId === activeWs.value).map((t) => t.project).filter((p): p is string => !!p))].sort().map((p) => html`<option value=${p}>@${p}</option>`)}
       </select>
       <select value=${() => tableParams.value[1]}
         @change=${(ev: Event) => {
-          tableParams.value = [tableParams.value[0], (ev.target as HTMLSelectElement).value];
-        }}>
+      tableParams.value = [tableParams.value[0], (ev.target as HTMLSelectElement).value];
+    }}>
         <option value="0">Pendientes</option>
         <option value="1">Completadas</option>
       </select>
@@ -190,15 +282,15 @@ function tablaView(): NixTemplate {
         </thead>
         <tbody>
           ${() =>
-            localTasks.value
-              .filter((t) => {
-                const [proyecto, done] = tableParams.value;
-                if (t.workspaceId !== activeWs.value) return false;
-                if (proyecto && t.project !== proyecto) return false;
-                if (done === "1" ? !t.done : t.done) return false;
-                return true;
-              })
-              .map((t) => html`
+      localTasks.value
+        .filter((t) => {
+          const [proyecto, done] = tableParams.value;
+          if (t.workspaceId !== activeWs.value) return false;
+          if (proyecto && t.project !== proyecto) return false;
+          if (done === "1" ? !t.done : t.done) return false;
+          return true;
+        })
+        .map((t) => html`
                 <tr>
                   <td>
                     <button class=${"mini-checkbox" + (t.done ? " checked" : "")} aria-label="completar"
@@ -210,9 +302,9 @@ function tablaView(): NixTemplate {
                   <td>${t.priority ? html`<span class=${"badge priority-" + t.priority}>${t.priority}</span>` : ""}</td>
                 </tr>`)}
           ${() =>
-            rows.length === 0
-              ? html`<tr><td colspan="5" class="empty-state">No hay tareas que coincidan con los filtros</td></tr>`
-              : ""}
+      rows.length === 0
+        ? html`<tr><td colspan="5" class="empty-state">No hay tareas que coincidan con los filtros</td></tr>`
+        : ""}
         </tbody>
       </table>
     </div>
@@ -262,9 +354,9 @@ function calendarioView(): NixTemplate {
           <div class=${"calendar-cell" + (cell.other ? " other-month" : "") + (cell.isToday ? " today" : "")}>
             <div class="day-number">${Number(cell.date.slice(8, 10))}</div>
             ${() =>
-              localTasks.value
-                .filter((t) => t.workspaceId === activeWs.value && t.dueDate === cell.date && !cell.other)
-                .map((t) => html`<button class=${"cal-task" + " " + (t.priority ?? "") + (t.done ? " done" : "")}
+      localTasks.value
+        .filter((t) => t.workspaceId === activeWs.value && t.dueDate === cell.date && !cell.other)
+        .map((t) => html`<button class=${"cal-task" + " " + (t.priority ?? "") + (t.done ? " done" : "")}
                   title=${t.title} @click=${() => openDoc(t.docId)}>${t.title}</button>`)}
           </div>`)}
       </div>
@@ -275,6 +367,10 @@ function calendarioView(): NixTemplate {
 // ----------------------------- Page -----------------------------
 
 export class TasksPage extends NixComponent {
+  onMount(): void {
+    void loadViews();
+  }
+
   render(): NixTemplate {
     return html`
       <div class="page">
@@ -282,17 +378,18 @@ export class TasksPage extends NixComponent {
           <h2>Tareas</h2>
           <div class="tabs">
             ${(["kanban", "tabla", "calendario"] as const).map(
-              (v) => html`<button class=${"tab" + (tasksView.value === v ? " active" : "")}
+      (v) => html`<button class=${"tab" + (tasksView.value === v ? " active" : "")}
                 @click=${() => (tasksView.value = v)}>${v}</button>`,
-            )}
+    )}
           </div>
         </div>
+        ${() => viewsBar()}
         ${() =>
-          tasksView.value === "kanban"
-            ? kanbanView()
-            : tasksView.value === "tabla"
-              ? tablaView()
-              : calendarioView()}
+        tasksView.value === "kanban"
+          ? kanbanView()
+          : tasksView.value === "tabla"
+            ? tablaView()
+            : calendarioView()}
       </div>
     `;
   }

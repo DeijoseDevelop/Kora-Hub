@@ -1155,6 +1155,29 @@ kbd {
   padding: 0 20px;
 }
 
+.views-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 20px 8px;
+}
+
+.views-bar select {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: border-color var(--fast), color var(--fast);
+}
+
+.views-bar select:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
 .list-toolbar select {
   background: var(--bg-soft);
   border: 1px solid var(--border-soft);

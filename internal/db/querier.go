@@ -22,6 +22,10 @@ type Querier interface {
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
+	// Saved views: filtros serializados por workspace (D1).
+	CreateSavedView(ctx context.Context, arg CreateSavedViewParams) error
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
+	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateUser(ctx context.Context, arg CreateUserParams) error
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
@@ -29,6 +33,7 @@ type Querier interface {
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
 	DeleteExpiredRefreshTokens(ctx context.Context) error
 	DeleteMembershipsOfWorkspace(ctx context.Context, workspaceID string) error
+	DeleteSavedView(ctx context.Context, arg DeleteSavedViewParams) error
 	DeleteTasksForDoc(ctx context.Context, docID string) error
 	DeleteWorkspaceAttachments(ctx context.Context, workspaceID string) error
 	DeleteWorkspaceChanges(ctx context.Context, workspaceID string) error
@@ -45,6 +50,7 @@ type Querier interface {
 	GetDocVersions(ctx context.Context, arg GetDocVersionsParams) ([]DocVersion, error)
 	GetMembership(ctx context.Context, arg GetMembershipParams) (Membership, error)
 	GetRefreshTokenByID(ctx context.Context, id string) (RefreshToken, error)
+	GetSavedView(ctx context.Context, arg GetSavedViewParams) (SavedView, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
@@ -65,6 +71,7 @@ type Querier interface {
 	ListDocsByWorkspace(ctx context.Context, workspaceID string) ([]Doc, error)
 	ListDocsForGraph(ctx context.Context, workspaceID string) ([]ListDocsForGraphRow, error)
 	ListMembersByWorkspace(ctx context.Context, workspaceID string) ([]ListMembersByWorkspaceRow, error)
+	ListSavedViews(ctx context.Context, workspaceID string) ([]SavedView, error)
 	ListTasksByDateRange(ctx context.Context, arg ListTasksByDateRangeParams) ([]Task, error)
 	ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]Task, error)
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
