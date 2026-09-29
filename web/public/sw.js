@@ -1,5 +1,5 @@
 // Service worker mínimo para la PWA instalable (sección 8.3).
-const CACHE = "zekrost-hub-v1";
+const CACHE = "kora-hub-v1";
 const CORE = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

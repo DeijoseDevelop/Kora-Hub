@@ -1,6 +1,6 @@
-// Zekrost Hub Desktop — shell Tauri 2.
+// Kora Hub Desktop — shell Tauri 2.
 //
-// Arquitectura sidecar: la app lanza el binario Go `hub` en
+// Arquitectura sidecar: la app lanza el binario Go `kora-hub` en
 // 127.0.0.1:<puerto libre> con los datos en el directorio de datos de
 // la app (100% local y offline-first). La ventana arranca con una
 // splash mínima y navega a la URL local cuando /healthz responde.
@@ -38,7 +38,7 @@ fn main() {
             let port = free_port()?;
             let url = format!("http://127.0.0.1:{}/", port);
 
-            let sidecar = app.shell().sidecar("zekrost-hub")?;
+            let sidecar = app.shell().sidecar("kora-hub")?;
             let (mut rx, child) = sidecar
                 .envs([
                     ("HUB_BIND", format!("127.0.0.1:{}", port)),
@@ -48,7 +48,7 @@ fn main() {
                     ("GIN_MODE", "release".into()),
                 ])
                 .spawn()
-                .map_err(|e| format!("no se pudo lanzar el sidecar zekrost-hub: {}", e))?;
+                .map_err(|e| format!("no se pudo lanzar el sidecar kora-hub: {}", e))?;
 
             *app.state::<ServerState>().0.lock().unwrap() = Some(child);
 
@@ -110,7 +110,7 @@ fn main() {
 }
 
 /// Directorio de datos por OS:
-/// Linux: ~/.local/share/dev.zekrost.hub/ · macOS: ~/Library/Application Support/ · Windows: %APPDATA%
+/// Linux: ~/.local/share/dev.kora.hub/ · macOS: ~/Library/Application Support/ · Windows: %APPDATA%
 fn load_or_create_secret(data_dir: &std::path::Path) -> Result<String, Box<dyn std::error::Error>> {
     let path = data_dir.join("hub_secret");
     if path.exists() {

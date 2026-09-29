@@ -1,14 +1,14 @@
-# Copyright (C) 2026 Zekrost <tech@zekrost.com>
+# Copyright (C) 2026 Deijose <tech@deijose.dev>
 # SPDX-License-Identifier: AGPL-3.0-only
-# Zekrost Hub — Makefile
+# Kora Hub — Makefile
 # Pipeline local: frontend -> embed -> binario único (P3).
 
 SHELL := /bin/bash
 GO      := go
 GOFLAGS ?=
 VERSION ?= dev
-BIN     := bin/zekrost-hub
-LDFLAGS := -s -w -X github.com/zekrost/hub/internal/server.Version=$(VERSION)
+BIN     := bin/kora-hub
+LDFLAGS := -s -w -X github.com/DeijoseDevelop/Kora-Hub/internal/server.Version=$(VERSION)
 
 .PHONY: all dev build frontend generate db test vet lint run docker desktop-dev desktop-build clean
 
@@ -44,7 +44,7 @@ vet:
 
 ## docker: imagen multi-stage con binario final
 docker:
-	docker build -t zekrost/hub:$(VERSION) .
+	docker build -t kora-hub:$(VERSION) .
 
 ## desktop-dev: sidecar + shell Tauri en modo desarrollo
 desktop-dev:

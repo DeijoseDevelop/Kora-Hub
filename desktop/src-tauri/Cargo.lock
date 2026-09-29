@@ -5038,7 +5038,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zekrost-hub-desktop"
+name = "kora-hub-desktop"
 version = "0.1.0"
 dependencies = [
  "serde",
