@@ -6,7 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-09-29
+## [0.3.0] — 2026-09-29
 
 ### Added
 
@@ -71,6 +71,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 - El sync LWW solo guardaba el hash de la versión perdedora (snapshot
   irrecuperable); ahora escribe el contenido en `.versions/`.
 - Test con fecha fija `2026-09-01` caducada → fecha siempre futura.
+
+## [0.2.0] — 2026-08-20
+
+### Changed
+
+- **Rebrand completo Zekrost Hub → Kora Hub** y migración del
+  repositorio a `DeijoseDevelop/Kora-Hub`.
+- Release publicado vía GoReleaser: binarios Linux/macOS/Windows
+  (amd64 + arm64), instaladores de escritorio (deb, rpm, AppImage,
+  msi, exe, dmg) e imagen Docker en GHCR.
 
 ## [0.1.2] — 2026-08-16
 
