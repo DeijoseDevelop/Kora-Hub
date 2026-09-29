@@ -52,7 +52,7 @@ func New(cfg *config.Config, queries *db.Queries, conn *sql.DB, logger *slog.Log
 	s.mcp = mcp.NewHandler(mcp.Deps{
 		Queries: s.queries, Conn: s.conn, Store: s.store, Indexer: s.indexer,
 		Config: s.cfg, Logger: s.logger,
-		Resolve: s.resolveWorkspace,
+		Resolve: s.resolveWorkspace, Version: Version,
 	})
 	return s
 }

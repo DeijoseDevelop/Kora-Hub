@@ -40,10 +40,14 @@ func (h *Handler) Handle(ctx context.Context, userID, wantWorkspace string, body
 
 	switch req.Method {
 	case "initialize":
+		version := h.deps.Version
+		if version == "" {
+			version = "dev"
+		}
 		resp.Result = map[string]any{
 			"protocolVersion": "2025-06-18",
 			"capabilities":    map[string]any{"tools": map[string]any{}},
-			"serverInfo":      map[string]any{"name": "kora-hub", "version": "dev"},
+			"serverInfo":      map[string]any{"name": "kora-hub", "version": version},
 		}
 	case "ping":
 		resp.Result = map[string]any{}

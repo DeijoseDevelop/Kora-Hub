@@ -70,6 +70,8 @@ type Deps struct {
 	Config  *config.Config
 	Logger  *slog.Logger
 	Resolve ResolveWorkspace
+	// Version es la del binario (-ldflags), la misma que /version.
+	Version string
 }
 
 // Tool describimos una herramienta con su JSON Schema de entrada.

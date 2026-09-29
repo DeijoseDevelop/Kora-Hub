@@ -68,6 +68,10 @@ func TestMCPProtocol(t *testing.T) {
 	if info["name"] != "kora-hub" {
 		t.Fatalf("serverInfo.name = %v", info["name"])
 	}
+	// la version es la del binario (-ldflags), igual que /version
+	if info["version"] != Version {
+		t.Fatalf("serverInfo.version = %v, esperada %v", info["version"], Version)
+	}
 
 	list := mcpCall(t, srv, token, "tools/list", nil)
 	tools, _ := list["result"].(map[string]any)["tools"].([]any)
