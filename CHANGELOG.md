@@ -36,6 +36,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
   binarios del ZIP registrados como adjuntos, rutas maliciosas y
   directorios ocultos (`.obsidian/`, `.trash/`) descartados, reindex
   automático. Botones Exportar/Importar en Ajustes.
+- **Importador de Notion**: el mismo endpoint detecta automáticamente
+  el export de Notion (sufijo de 32 hex en los nombres) y normaliza:
+  nombres de archivo/carpeta sin ID, enlaces internos reescritos y
+  bases de datos CSV convertidas a documentos con tabla Markdown.
 
 ### Fixed
 

@@ -165,6 +165,52 @@ func TestImportWorkspace(t *testing.T) {
 	}
 }
 
+// TestImportNotionExport cubre la normalización del export de Notion:
+// sufijos de 32 hex en nombres, enlaces internos reescritos y CSV de
+// base de datos convertido a tabla Markdown.
+func TestImportNotionExport(t *testing.T) {
+	srv, ownerID := testServer(t)
+	token, _ := srv.authSvc.AccessToken(ownerID, nil)
+	wsID := workspaceID(t, srv, ownerID)
+
+	pageID := "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+	subID := "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c"
+	dbID := "aaaa1111bbbb2222cccc3333dddd4444"
+
+	w := postZIP(t, srv, wsID, token, map[string]string{
+		"Export-x/Pagina " + pageID + ".md":    "# Página\n\nVer [sub](Sub%20Pagina%20" + subID + ".md)\n",
+		"Export-x/Sub Pagina " + subID + ".md": "# Sub\n",
+		"Export-x/Base " + dbID + ".csv":       "Name,Status\nAlpha,Done\nBeta,Open\n",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("import status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	// nombres normalizados sin el ID de Notion
+	readme, err := srv.store.Read("ws", "Pagina.md")
+	if err != nil {
+		t.Fatalf("Pagina.md no quedó: %v", err)
+	}
+	if _, err := srv.store.Read("ws", "Sub Pagina.md"); err != nil {
+		t.Fatal("Sub Pagina.md no quedó")
+	}
+	// el enlace interno apunta al nombre normalizado
+	if !bytes.Contains(readme, []byte("Sub%20Pagina.md)")) {
+		t.Fatalf("enlace no reescrito: %s", readme)
+	}
+	if bytes.Contains(readme, []byte(subID)) {
+		t.Fatalf("el ID de Notion sigue en el contenido: %s", readme)
+	}
+	// el CSV se convirtió a tabla Markdown
+	csvDoc, err := srv.store.Read("ws", "Base.md")
+	if err != nil {
+		t.Fatal("el CSV no se convirtió a doc")
+	}
+	if !bytes.Contains(csvDoc, []byte("| Name | Status |")) || !bytes.Contains(csvDoc, []byte("| Alpha | Done |")) {
+		t.Fatalf("tabla CSV incorrecta: %s", csvDoc)
+	}
+}
+
 // TestImportForbidden un viewer no puede importar (muta el árbol).
 func TestImportForbidden(t *testing.T) {
 	srv, ownerID := testServer(t)

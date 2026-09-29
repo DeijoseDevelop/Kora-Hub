@@ -6,9 +6,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"database/sql"
+	"encoding/csv"
 	"io"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/DeijoseDevelop/Kora-Hub/internal/attachments"
@@ -98,6 +100,7 @@ func (s *Server) handleImportWorkspace(c *gin.Context) {
 		return
 	}
 
+	notion := isNotionExport(zr)
 	imported, skipped, attached := 0, 0, 0
 	// una sola carpeta raíz redundante ("MiVault/x.md") se despoja para
 	// que el árbol quede en la raíz del workspace
@@ -112,6 +115,9 @@ func (s *Server) handleImportWorkspace(c *gin.Context) {
 		if rel == "" {
 			continue
 		}
+		if notion {
+			rel = stripNotionIDs(rel)
+		}
 		rc, err := f.Open()
 		if err != nil {
 			skipped++
@@ -123,18 +129,37 @@ func (s *Server) handleImportWorkspace(c *gin.Context) {
 			skipped++
 			continue
 		}
-		if strings.HasSuffix(strings.ToLower(rel), ".md") {
+		lower := strings.ToLower(rel)
+		switch {
+		case strings.HasSuffix(lower, ".md"):
+			if notion {
+				content = rewriteNotionLinks(content)
+			}
 			if err := s.store.Write(r.workspace.Slug, rel, content); err != nil {
 				skipped++
 				continue
 			}
 			imported++
-			continue
-		}
-		if s.importAttachment(c, r.workspace.ID, r.workspace.Slug, rel, content, int64(f.UncompressedSize64)) {
-			attached++
-		} else {
-			skipped++
+		case notion && strings.HasSuffix(lower, ".csv"):
+			// las bases de datos de Notion exportan CSV: se convierten
+			// a un doc con tabla Markdown (sustituye .csv por .md)
+			md, ok := csvToMarkdown(strings.TrimSuffix(path.Base(rel), path.Ext(rel)), content)
+			if !ok {
+				skipped++
+				continue
+			}
+			docPath := strings.TrimSuffix(rel, path.Ext(rel)) + ".md"
+			if err := s.store.Write(r.workspace.Slug, docPath, md); err != nil {
+				skipped++
+				continue
+			}
+			imported++
+		default:
+			if s.importAttachment(c, r.workspace.ID, r.workspace.Slug, rel, content, int64(f.UncompressedSize64)) {
+				attached++
+			} else {
+				skipped++
+			}
 		}
 	}
 
@@ -216,4 +241,88 @@ func commonPrefix(zr *zip.Reader) string {
 		}
 	}
 	return prefix
+}
+
+// ------------------------- Normalización Notion -------------------------
+// El export de Notion sufija cada página y carpeta con su ID interno
+// ("Mi Página 1a2b3c….md"), enlaza entre páginas con esos nombres
+// codificados y exporta las bases de datos como CSV.
+
+var notionSuffixRe = regexp.MustCompile(`^(.+?)\s[0-9a-fA-F]{32}$`)
+
+// isNotionExport detecta el export de Notion por el sufijo de 32 hex en
+// los nombres de archivo (cualquier entrada lo delata).
+func isNotionExport(zr *zip.Reader) bool {
+	for _, f := range zr.File {
+		base := path.Base(strings.ReplaceAll(f.Name, "\\", "/"))
+		if notionSuffixRe.MatchString(strings.TrimSuffix(base, path.Ext(base))) {
+			return true
+		}
+	}
+	return false
+}
+
+// stripNotionIDs quita el sufijo " <32-hex>" de cada segmento de la
+// ruta (tanto carpetas como el propio archivo), conservando extensión.
+func stripNotionIDs(rel string) string {
+	parts := strings.Split(rel, "/")
+	for i, p := range parts {
+		ext := path.Ext(p)
+		if m := notionSuffixRe.FindStringSubmatch(strings.TrimSuffix(p, ext)); m != nil {
+			parts[i] = m[1] + ext
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+// notionLinkRe localiza el sufijo de ID dentro de un destino de enlace
+// Markdown: "%20<32hex>.md" o " <32hex>.md" y el equivalente para
+// carpetas (…hex/). El ID solo aparece como sufijo de Notion, por lo
+// que la sustitución global sobre el contenido es segura.
+var (
+	notionLinkFileRe = regexp.MustCompile(`(?:%20| )[0-9a-fA-F]{32}\.md`)
+	notionLinkDirRe  = regexp.MustCompile(`(?:%20| )[0-9a-fA-F]{32}/`)
+)
+
+// rewriteNotionLinks actualiza los enlaces internos del documento para
+// apuntar a los nombres ya normalizados (sin el ID de página).
+func rewriteNotionLinks(content []byte) []byte {
+	s := notionLinkFileRe.ReplaceAllString(string(content), ".md")
+	s = notionLinkDirRe.ReplaceAllString(s, "/")
+	return []byte(s)
+}
+
+// csvToMarkdown convierte el CSV de una base de datos de Notion en un
+// documento con tabla Markdown. Se capa a 500 filas de datos para no
+// inflar el documento con exports enormes.
+func csvToMarkdown(title string, raw []byte) ([]byte, bool) {
+	rows, err := csv.NewReader(bytes.NewReader(raw)).ReadAll()
+	if err != nil || len(rows) == 0 {
+		return nil, false
+	}
+	if len(rows) > 501 {
+		rows = rows[:501]
+	}
+	esc := func(s string) string {
+		return strings.ReplaceAll(strings.TrimSpace(s), "|", "\\|")
+	}
+	var b strings.Builder
+	b.WriteString("# " + title + "\n\n")
+	writeRow := func(row []string) {
+		b.WriteString("|")
+		for _, c := range row {
+			b.WriteString(" " + esc(c) + " |")
+		}
+		b.WriteByte('\n')
+	}
+	writeRow(rows[0])
+	b.WriteString("|")
+	for range rows[0] {
+		b.WriteString(" --- |")
+	}
+	b.WriteByte('\n')
+	for _, row := range rows[1:] {
+		writeRow(row)
+	}
+	return []byte(b.String()), true
 }
