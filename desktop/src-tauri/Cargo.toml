@@ -1,6 +1,6 @@
 [package]
 name = "kora-hub-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "Kora Hub — shell de escritorio con sidecar Go embebido"
 edition = "2021"
 rust-version = "1.77"
