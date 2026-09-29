@@ -3,6 +3,7 @@
 import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
 import { workspacesApi, type Member } from "../../api/client";
 import { showToast } from "../../ui/kit";
+import { t } from "../../i18n";
 
 // Panel de miembros de un workspace (solo owners lo ven): lista,
 // invitación por email y cambio de rol/expulsión. El backend es la
@@ -38,7 +39,7 @@ export class MembersPanel extends NixComponent {
     try {
       await workspacesApi.addMember(this.wsId, this.email.trim(), this.role);
       this.email = "";
-      showToast("Miembro añadido");
+      showToast(t("settings.member_added"));
       await this.load();
     } catch (e) {
       showToast((e as Error).message);
@@ -57,7 +58,7 @@ export class MembersPanel extends NixComponent {
   private async remove(uid: string): Promise<void> {
     try {
       await workspacesApi.removeMember(this.wsId, uid);
-      showToast("Miembro eliminado");
+      showToast(t("settings.member_removed"));
       await this.load();
     } catch (e) {
       showToast((e as Error).message);
@@ -68,12 +69,12 @@ export class MembersPanel extends NixComponent {
     return html`
       <div class="members-panel">
         ${() =>
-          this.members.value.map((m) => html`
+        this.members.value.map((m) => html`
             <div class="member-row">
               <span><strong>${m.display_name}</strong> <span class="muted">${m.email}</span></span>
               <span class="member-actions">
                 <select value=${m.role} @change=${(ev: Event) =>
-                  void this.setRole(m.user_id, (ev.target as HTMLSelectElement).value)}>
+            void this.setRole(m.user_id, (ev.target as HTMLSelectElement).value)}>
                   <option value="owner">owner</option>
                   <option value="editor">editor</option>
                   <option value="viewer">viewer</option>
@@ -83,19 +84,19 @@ export class MembersPanel extends NixComponent {
             </div>
           `)}
         <form class="member-invite" @submit=${(ev: Event) => {
-          ev.preventDefault();
-          void this.invite();
-        }}>
-          <input type="email" placeholder="email del usuario" required
+        ev.preventDefault();
+        void this.invite();
+      }}>
+          <input type="email" placeholder=${() => t("settings.members_email_ph")} required
             @input=${(ev: Event) => (this.email = (ev.target as HTMLInputElement).value)} />
           <select @change=${(ev: Event) => (this.role = (ev.target as HTMLSelectElement).value)}>
             <option value="editor">editor</option>
             <option value="viewer">viewer</option>
             <option value="owner">owner</option>
           </select>
-          <button class="btn sm" type="submit">Invitar</button>
+          <button class="btn sm" type="submit">${() => t("settings.invite")}</button>
         </form>
-        <p class="muted sm">El usuario debe estar registrado en esta instancia.</p>
+        <p class="muted sm">${() => t("settings.members_hint")}</p>
       </div>
     `;
   }

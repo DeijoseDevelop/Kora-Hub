@@ -2,6 +2,7 @@ import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
 import { authApi, getToken, setSession } from "../../api/client";
 import { router } from "../../router";
 import { showToast } from "../../ui/kit";
+import { t } from "../../i18n";
 
 // Pantalla Auth: tabs "Entrar" / "Crear cuenta". En el primer arranque
 // (sin usuarios registrados) "Crear cuenta" es la opción por defecto.
@@ -26,7 +27,7 @@ export class HomePage extends NixComponent {
 
   private submit(): void {
     if (this.password.value.length < 8) {
-      showToast("La contraseña debe tener al menos 8 caracteres");
+      showToast(t("auth.pw_short"));
       return;
     }
     const run = this.mode.value === "login"
@@ -36,7 +37,7 @@ export class HomePage extends NixComponent {
       .then((session) => {
         setSession(session);
         window.dispatchEvent(new CustomEvent("hub:login"));
-        showToast(this.mode.value === "register" ? "Cuenta creada — bienvenido" : "Sesión iniciada");
+        showToast(this.mode.value === "register" ? t("auth.registered") : t("auth.logged_in"));
       })
       .catch((e: Error) => showToast(e.message));
   }
@@ -47,47 +48,44 @@ export class HomePage extends NixComponent {
         <div class="login-card">
           <div class="logo-mark login-mark"><img src="/kora-hub-logo.png" alt="Kora Hub" /></div>
           <h2>Kora Hub</h2>
-          <p class="login-sub">El workspace donde la documentación y la ejecución son la misma cosa.</p>
+          <p class="login-sub">${() => t("auth.tagline")}</p>
           <div class="tabs" style="margin-bottom: 16px">
             <button class=${() => "tab" + (this.mode.value === "login" ? " active" : "")}
-              @click=${() => (this.mode.value = "login")}>Entrar</button>
+              @click=${() => (this.mode.value = "login")}>${() => t("auth.login")}</button>
             <button class=${() => "tab" + (this.mode.value === "register" ? " active" : "")}
-              @click=${() => (this.mode.value = "register")}>Crear cuenta</button>
+              @click=${() => (this.mode.value = "register")}>${() => t("auth.register")}</button>
           </div>
           <form @submit=${(ev: Event) => {
-            ev.preventDefault();
-            this.submit();
-          }}>
+        ev.preventDefault();
+        this.submit();
+      }}>
             ${() =>
-              this.mode.value === "register"
-                ? html`
+        this.mode.value === "register"
+          ? html`
                     <div class="field">
-                      <input type="text" placeholder="Nombre visible" value=${() => this.displayName.value}
+                      <input type="text" placeholder=${() => t("auth.name_ph")} value=${() => this.displayName.value}
                         @input=${(ev: Event) => (this.displayName.value = (ev.target as HTMLInputElement).value)} />
                     </div>`
-                : ""}
+          : ""}
             <div class="field">
               <input type="email" placeholder="Email" value=${() => this.email.value}
                 @input=${(ev: Event) => (this.email.value = (ev.target as HTMLInputElement).value)} />
             </div>
             <div class="field password-field">
               <input type=${() => (this.showPassword.value ? "text" : "password")}
-                placeholder="Contraseña (mín. 8)" value=${() => this.password.value}
+                placeholder=${() => t("auth.password_ph")} value=${() => this.password.value}
                 @input=${(ev: Event) => (this.password.value = (ev.target as HTMLInputElement).value)} />
-              <button type="button" class="eye-toggle" title="Mostrar/ocultar contraseña"
+              <button type="button" class="eye-toggle" title=${() => t("auth.show_pw")}
                 @click=${() => (this.showPassword.value = !this.showPassword.value)}>
                 ${() =>
-                  this.showPassword.value
-                    ? html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`
-                    : html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`}
+        this.showPassword.value
+          ? html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`
+          : html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-8-10-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`}
               </button>
             </div>
-            <button class="btn" type="submit">${() => (this.mode.value === "login" ? "Entrar" : "Crear cuenta")}</button>
+            <button class="btn" type="submit">${() => (this.mode.value === "login" ? t("auth.login") : t("auth.register"))}</button>
           </form>
-          <p class="login-hint">
-            Datos 100% locales y offline-first. Al crear tu cuenta se configura
-            tu workspace "Personal" automáticamente.
-          </p>
+          <p class="login-hint">${() => t("auth.hint")}</p>
         </div>
       </div>
     `;

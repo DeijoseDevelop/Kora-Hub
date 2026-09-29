@@ -5,6 +5,7 @@ import { activeWs } from "../data/workspace";
 import { quickAddLocal } from "../data/mutations";
 import { currentRole } from "../api/role";
 import { fuzzyMatch, showPrompt, showToast } from "../ui/kit";
+import { t } from "../i18n";
 
 type PaletteKind = "action" | "doc" | "task";
 
@@ -41,37 +42,37 @@ export class CommandPalette extends NixComponent {
     const items: PaletteItem[] = [
       {
         kind: "action",
-        label: "Nueva tarea…",
+        label: t("palette.new_task"),
         sub: "Quick Add Magic",
         action: () => {
-          void showPrompt("Nueva tarea", 'ej. "llamar al cliente mañana @ventas !alta"').then((text) => {
+          void showPrompt(t("palette.new_task_title"), t("palette.new_task_ph")).then((text) => {
             if (!text) return;
             void currentRole().then((role) => {
               if (role === "viewer") {
-                showToast("rol viewer: solo lectura");
+                showToast(t("tasks.viewer_ro"));
                 return;
               }
               quickAddLocal(text)
-                .then((t) => showToast(t ? `Tarea creada: ${t.title}` : "No se pudo interpretar"))
+                .then((tk) => showToast(tk ? t("tasks.created", { title: tk.title }) : t("tasks.unparseable")))
                 .catch((e: Error) => showToast(e.message));
             });
           });
         },
       },
-      { kind: "action", label: "Nuevo documento", sub: "Crear en el workspace", action: () => router.navigate("/docs") },
-      { kind: "action", label: "Ir a Tareas", sub: "Kanban · tabla · calendario", action: () => router.navigate("/tasks") },
-      { kind: "action", label: "Ir al Grafo", sub: "Relaciones entre documentos", action: () => router.navigate("/graph") },
+      { kind: "action", label: t("palette.new_doc"), sub: t("palette.create_in_ws"), action: () => router.navigate("/docs") },
+      { kind: "action", label: t("palette.goto_tasks"), sub: t("palette.tasks_sub"), action: () => router.navigate("/tasks") },
+      { kind: "action", label: t("palette.goto_graph"), sub: t("palette.graph_sub"), action: () => router.navigate("/graph") },
     ];
 
     for (const d of localDocs.value.filter((x) => x.workspaceId === activeWs.value)) {
       items.push({ kind: "doc", label: d.title, sub: d.path, action: () => router.navigate("/docs/" + d.id) });
     }
-    for (const t of localTasks.value.filter((x) => x.workspaceId === activeWs.value).slice(0, 40)) {
+    for (const tk of localTasks.value.filter((x) => x.workspaceId === activeWs.value).slice(0, 40)) {
       items.push({
         kind: "task",
-        label: t.title,
-        sub: t.done ? "hecha" : t.project ? "@" + t.project : "tarea",
-        action: () => router.navigate("/docs/" + t.docId),
+        label: tk.title,
+        sub: tk.done ? t("palette.done") : tk.project ? "@" + tk.project : t("palette.task"),
+        action: () => router.navigate("/docs/" + tk.docId),
       });
     }
 
@@ -99,54 +100,56 @@ export class CommandPalette extends NixComponent {
   }
 
   render(): NixTemplate {
-    const groupLabel: Record<PaletteKind, string> = { action: "Acciones", doc: "Documentos", task: "Tareas" };
+    const groupLabel: Record<PaletteKind, string> = {
+      action: t("palette.actions"), doc: t("palette.docs"), task: t("palette.tasks"),
+    };
     const order: PaletteKind[] = ["action", "doc", "task"];
     return html`
       ${() =>
         this.open.value
           ? html`
               <div class="palette-backdrop" @click=${(ev: MouseEvent) => {
-                if ((ev.target as HTMLElement).classList.contains("palette-backdrop")) this.close();
-              }}>
+              if ((ev.target as HTMLElement).classList.contains("palette-backdrop")) this.close();
+            }}>
                 <div class="palette">
                   <div class="palette-input">
                     <span class="palette-icon">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                     </span>
-                    <input autocomplete="off" placeholder="Buscar documentos, tareas o ejecutar acciones…"
+                    <input autocomplete="off" placeholder=${() => t("palette.ph")}
                       value=${() => this.query.value}
                       @input=${(ev: Event) => {
-                        this.query.value = (ev.target as HTMLInputElement).value;
-                        this.rebuild();
-                      }}
+              this.query.value = (ev.target as HTMLInputElement).value;
+              this.rebuild();
+            }}
                       @keydown=${(ev: KeyboardEvent) => this.keydown(ev)} />
                   </div>
                   <div class="palette-results">
                     ${() =>
-                      order.map((kind) => {
-                        const group = this.items.value.filter((it) => it.kind === kind);
-                        if (!group.length) return "";
-                        return html`
+              order.map((kind) => {
+                const group = this.items.value.filter((it) => it.kind === kind);
+                if (!group.length) return "";
+                return html`
                           <div class="palette-section-label">${groupLabel[kind]}</div>
                           ${group.map((it) => html`
                             <div class=${"palette-item" + (this.items.value.indexOf(it) === this.selected ? " selected" : "")}
                               @click=${() => {
-                                it.action();
-                                this.close();
-                              }}
+                    it.action();
+                    this.close();
+                  }}
                               @mouseenter=${() => (this.selected = this.items.value.indexOf(it))}>
                               <span class="pi-text">${it.label}<span class="pi-sub"> · ${it.sub}</span></span>
                             </div>`)}`;
-                      })}
+              })}
                     ${() =>
-                      this.items.value.length === 0
-                        ? html`<div class="palette-empty">Sin resultados</div>`
-                        : ""}
+              this.items.value.length === 0
+                ? html`<div class="palette-empty">${() => t("palette.empty")}</div>`
+                : ""}
                   </div>
                   <div class="palette-footer">
-                    <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
-                    <span><kbd>Enter</kbd> abrir</span>
-                    <span><kbd>Esc</kbd> cerrar</span>
+                    <span><kbd>↑</kbd><kbd>↓</kbd> ${() => t("palette.nav")}</span>
+                    <span><kbd>Enter</kbd> ${() => t("palette.open")}</span>
+                    <span><kbd>Esc</kbd> ${() => t("palette.close")}</span>
                   </div>
                 </div>
               </div>

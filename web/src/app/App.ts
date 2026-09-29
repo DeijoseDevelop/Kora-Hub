@@ -9,6 +9,7 @@ import { setTasksView } from "../data/tasks-view";
 import { HomePage } from "../modules/home/HomePage";
 import { clearToken, getToken } from "../api/client";
 import { escapeHtml } from "../ui/kit";
+import { t } from "../i18n";
 
 const WS_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#8b5cf6"];
 
@@ -102,15 +103,15 @@ export class App extends NixComponent {
             <span>Kora Hub</span>
           </div>
           <div class="sidebar-search">
-            <input placeholder="Buscar en el workspace..."
+            <input placeholder=${() => t("app.search_ph")}
               value=${() => this.searchQ.value}
               @input=${(ev: Event) => (this.searchQ.value = (ev.target as HTMLInputElement).value)} />
           </div>
           ${() =>
-            this.authed.value
-              ? html`
+        this.authed.value
+          ? html`
                   <div class="sidebar-section">
-                    <div class="section-label">Workspaces</div>
+                    <div class="section-label">${() => t("app.workspaces")}</div>
                     <div class="ws-list">
                       ${this.workspaces.value.map((ws, i) => html`
                         <button class=${"ws-item" + (activeWs.value === ws.id ? " active" : "")}
@@ -122,43 +123,43 @@ export class App extends NixComponent {
                     </div>
                   </div>
                   <div class="sidebar-section">
-                    <div class="section-label">Documentos</div>
+                    <div class="section-label">${() => t("app.docs")}</div>
                     <div class="docs-list">
                       ${() =>
-                        localDocs.value
-                          .filter((d) => d.workspaceId === activeWs.value)
-                          .filter(
-                            (d) =>
-                              !this.searchQ.value ||
-                              d.title.toLowerCase().includes(this.searchQ.value.toLowerCase()) ||
-                              d.path.toLowerCase().includes(this.searchQ.value.toLowerCase()),
-                          )
-                          .map(
-                            (d) => html`
+              localDocs.value
+                .filter((d) => d.workspaceId === activeWs.value)
+                .filter(
+                  (d) =>
+                    !this.searchQ.value ||
+                    d.title.toLowerCase().includes(this.searchQ.value.toLowerCase()) ||
+                    d.path.toLowerCase().includes(this.searchQ.value.toLowerCase()),
+                )
+                .map(
+                  (d) => html`
                               <button class="doc-item" @click=${() => {
-                                this.sidebarOpen.value = false;
-                                router.navigate("/docs/" + d.id);
-                              }}>
+                      this.sidebarOpen.value = false;
+                      router.navigate("/docs/" + d.id);
+                    }}>
                                 <svg class="doc-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                 <span class="doc-name">${escapeHtml(d.title)}</span>
                               </button>`,
-                          )}
+                )}
                       ${() =>
-                        localDocs.value.length === 0
-                          ? html`<div class="muted" style="padding: 8px 12px; font-size: 12px">Sin documentos aún</div>`
-                          : ""}
+              localDocs.value.length === 0
+                ? html`<div class="muted" style="padding: 8px 12px; font-size: 12px">${() => t("app.no_docs")}</div>`
+                : ""}
                     </div>
                   </div>
                   <div class="sidebar-spacer"></div>
                   <button class="new-doc-btn" @click=${() => {
-                    this.sidebarOpen.value = false;
-                    router.navigate("/docs");
-                  }}>
+              this.sidebarOpen.value = false;
+              router.navigate("/docs");
+            }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                    Nuevo documento
+                    ${() => t("app.new_doc")}
                   </button>
                 `
-              : html`<div class="sidebar-spacer"></div>`}
+          : html`<div class="sidebar-spacer"></div>`}
         </aside>
 
         <main class="main">
@@ -173,31 +174,31 @@ export class App extends NixComponent {
               <span class="sep">/</span>
               <span class="doc-name">
                 ${() =>
-                  localDocs.value.find((d) => d.id === (router.current.value.match(/^\/docs\/(.+)$/)?.[1] ?? ""))?.title ?? ""}
+        localDocs.value.find((d) => d.id === (router.current.value.match(/^\/docs\/(.+)$/)?.[1] ?? ""))?.title ?? ""}
               </span>
             </div>
             <div class="view-switcher">
               ${(() => {
-                const views: Array<{ label: string; isActive: (cur: string) => boolean; go: () => void }> = [
-                  { label: "Documentos", isActive: (c) => c.startsWith("/docs"), go: () => router.navigate("/docs") },
-                  { label: "Kanban", isActive: (c) => c.startsWith("/tasks") && !c.includes("view="), go: () => { setTasksView("kanban"); router.navigate("/tasks"); } },
-                  { label: "Tabla", isActive: (c) => c.includes("view=tabla"), go: () => { setTasksView("tabla"); router.navigate({ name: "tasks", query: { view: "tabla" } }); } },
-                  { label: "Calendario", isActive: (c) => c.includes("view=calendario"), go: () => { setTasksView("calendario"); router.navigate({ name: "tasks", query: { view: "calendario" } }); } },
-                  { label: "Grafo", isActive: (c) => c.startsWith("/graph"), go: () => router.navigate("/graph") },
-                  { label: "Ajustes", isActive: (c) => c.startsWith("/settings"), go: () => router.navigate("/settings") },
-                ];
-                return views.map((v) => html`<button class=${"tab" + (v.isActive(router.current.value) ? " active" : "")}
+        const views: Array<{ label: string; isActive: (cur: string) => boolean; go: () => void }> = [
+          { label: t("app.nav.docs"), isActive: (c) => c.startsWith("/docs"), go: () => router.navigate("/docs") },
+          { label: t("app.nav.kanban"), isActive: (c) => c.startsWith("/tasks") && !c.includes("view="), go: () => { setTasksView("kanban"); router.navigate("/tasks"); } },
+          { label: t("app.nav.table"), isActive: (c) => c.includes("view=tabla"), go: () => { setTasksView("tabla"); router.navigate({ name: "tasks", query: { view: "tabla" } }); } },
+          { label: t("app.nav.calendar"), isActive: (c) => c.includes("view=calendario"), go: () => { setTasksView("calendario"); router.navigate({ name: "tasks", query: { view: "calendario" } }); } },
+          { label: t("app.nav.graph"), isActive: (c) => c.startsWith("/graph"), go: () => router.navigate("/graph") },
+          { label: t("app.nav.settings"), isActive: (c) => c.startsWith("/settings"), go: () => router.navigate("/settings") },
+        ];
+        return views.map((v) => html`<button class=${"tab" + (v.isActive(router.current.value) ? " active" : "")}
                   @click=${() => v.go()}>${v.label}</button>`);
-              })()}
+      })()}
             </div>
             <div class="sync-indicator">
               <span class=${"dot" + (this.online.value ? " dot-on" : " dot-off")}></span>
-              <span class="text">${() => (this.online.value ? "en línea" : "sin conexión")}</span>
-              ${() => (this.pending.value > 0 ? html` · ${this.pending.value} pendientes` : "")}
+              <span class="text">${() => (this.online.value ? t("app.online") : t("app.offline"))}</span>
+              ${() => (this.pending.value > 0 ? html` · ${this.pending.value} ${t("app.pending")}` : "")}
             </div>
             <button class="cmd-btn" @click=${() => this.palette.toggle()}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              Buscar <kbd>⌘K</kbd>
+              ${() => t("app.search")} <kbd>⌘K</kbd>
             </button>
           </header>
           <main class="content">${new RouterView()}</main>

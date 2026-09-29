@@ -3,62 +3,65 @@
 // Plantillas de documento (MVP sección 9.1): propuesta, acta de
 // reunión, RFC y retrospectiva. Son contenido inicial Markdown —
 // cliente-side para funcionar offline y sin endpoint dedicado.
+// Las etiquetas y los esqueletos siguen el idioma activo (D4).
+
+import { t } from "../i18n";
 
 export interface DocTemplate {
   id: string;
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string;
   skeleton: (title: string) => string;
 }
 
 const blank: DocTemplate = {
   id: "blank",
-  label: "Documento vacío",
-  description: "Empieza desde cero",
-  skeleton: (t) => `# ${t}\n\n`,
+  labelKey: "tpl.blank",
+  descKey: "tpl.blank_desc",
+  skeleton: (title) => `# ${title}\n\n`,
 };
 
 export const DOC_TEMPLATES: DocTemplate[] = [
   blank,
   {
     id: "propuesta",
-    label: "Propuesta",
-    description: "Propuesta de funcionalidad o cambio",
-    skeleton: (t) => `# ${t}
+    labelKey: "tpl.propuesta",
+    descKey: "tpl.propuesta_desc",
+    skeleton: (title) => `# ${title}
 
-## Contexto
-
-
-## Propuesta
+## ${t("tpl.sec.contexto")}
 
 
-## Alternativas consideradas
+## ${t("tpl.sec.propuesta")}
 
 
-## Tareas
+## ${t("tpl.sec.alternativas")}
+
+
+## ${t("tpl.sec.tareas")}
 
 - [ ]  #hoy @proyecto
 
-## Decisiones
+## ${t("tpl.sec.decisiones")}
 
 `,
   },
   {
     id: "acta",
-    label: "Acta de reunión",
-    description: "Minuta con acuerdos y acciones",
-    skeleton: (t) => `# ${t}
+    labelKey: "tpl.acta",
+    descKey: "tpl.acta_desc",
+    skeleton: (title) => `# ${title}
 
-**Fecha:** ${new Date().toISOString().slice(0, 10)}
-**Asistentes:**
+**${t("tpl.fecha")}:** ${new Date().toISOString().slice(0, 10)}
+**${t("tpl.asistentes")}:**
 
-## Temas tratados
-
-
-## Acuerdos
+## ${t("tpl.sec.temas")}
 
 
-## Acciones
+## ${t("tpl.sec.acuerdos")}
+
+
+## ${t("tpl.sec.acciones")}
 
 - [ ]  ~responsable #fecha
 
@@ -66,48 +69,57 @@ export const DOC_TEMPLATES: DocTemplate[] = [
   },
   {
     id: "rfc",
-    label: "RFC",
-    description: "Request for comments técnico",
-    skeleton: (t) => `# RFC: ${t}
+    labelKey: "tpl.rfc",
+    descKey: "tpl.rfc_desc",
+    skeleton: (title) => `# RFC: ${title}
 
-**Estado:** borrador
-**Autor:**
+**${t("tpl.estado")}:** ${t("tpl.borrador")}
+**${t("tpl.autor")}:**
 
-## Resumen
-
-
-## Motivación
+## ${t("tpl.sec.resumen")}
 
 
-## Diseño
+## ${t("tpl.sec.motivacion")}
 
 
-## Plan de implementación
+## ${t("tpl.sec.diseno")}
+
+
+## ${t("tpl.sec.plan")}
 
 - [ ]  #hoy
 
-## Preguntas abiertas
+## ${t("tpl.sec.preguntas")}
 
 `,
   },
   {
     id: "retro",
-    label: "Retrospectiva",
-    description: "Retro de sprint o proyecto",
-    skeleton: (t) => `# ${t}
+    labelKey: "tpl.retro",
+    descKey: "tpl.retro_desc",
+    skeleton: (title) => `# ${title}
 
-**Periodo:**
+**${t("tpl.periodo")}:**
 
-## Qué salió bien
-
-
-## Qué mejorar
+## ${t("tpl.sec.bien")}
 
 
-## Acciones
+## ${t("tpl.sec.mejorar")}
+
+
+## ${t("tpl.sec.acciones")}
 
 - [ ]  ~responsable
 
 `,
   },
 ];
+
+// label/desc resueltas en el idioma activo al renderizar el selector.
+export function templateLabel(tpl: DocTemplate): string {
+  return t(tpl.labelKey);
+}
+
+export function templateDesc(tpl: DocTemplate): string {
+  return t(tpl.descKey);
+}

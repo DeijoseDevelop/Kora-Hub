@@ -3,6 +3,7 @@ import { router } from "../../router";
 import { localDocs } from "../../data/store";
 import { activeWs } from "../../data/workspace";
 import { extractBacklinks } from "../../sync/local";
+import { t } from "../../i18n";
 
 interface GNode {
   id: string;
@@ -35,9 +36,9 @@ export class GraphPage extends NixComponent {
       <div class="view-graph">
         <canvas class="graph-canvas" ref=${this.canvasRef}></canvas>
         <div class="graph-legend">
-          <div class="legend-item"><span class="legend-dot"></span>Documento</div>
+          <div class="legend-item"><span class="legend-dot"></span>${() => t("graph.doc")}</div>
           <div class="legend-item"><span class="legend-line"></span>Backlink [[]]</div>
-          <div class="graph-hint">Doble clic en un nodo para abrirlo · Arrastra para mover</div>
+          <div class="graph-hint">${() => t("graph.hint")}</div>
         </div>
       </div>
     `;

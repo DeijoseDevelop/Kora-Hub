@@ -40,6 +40,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
   el export de Notion (sufijo de 32 hex en los nombres) y normaliza:
   nombres de archivo/carpeta sin ID, enlaces internos reescritos y
   bases de datos CSV convertidas a documentos con tabla Markdown.
+- **Vistas guardadas de tareas** (D1): `GET/POST/DELETE /views` por
+  workspace con filtros serializados; selector en la página de Tareas
+  con caché local para aplicarlas offline.
+- **Gramática de tareas v2** (D2, spec §6.5): `*every:<n>d|w|m|y`
+  (al completar se genera la siguiente ocurrencia con la fecha
+  recalculada, en el backend y en el mirror local), `^id:<slug>`
+  (identidad estable de línea), `^blocked-by:<slug>` (la tarea se
+  muestra «bloqueada» mientras la bloqueante no esté hecha) y valores
+  de metadatos con `"comillas"`. Parser Go + espejo TS con tests en
+  ambos lados; migración `007`.
+- **Servidor MCP** (D3): `POST /api/v1/mcp` (JSON-RPC 2.0, transporte
+  streamable HTTP, protocolo 2025-06-18) con 9 tools espejo 1:1 de la
+  REST — mismo Bearer, mismo resolver de workspace y mismos roles.
+- **i18n ES/EN** (D4): capa `t()` con signal de locale, catálogos
+  ES/EN en paridad (~120 claves), autodetección por el navegador,
+  persistencia en localStorage y selector en Ajustes; las plantillas
+  de documentos se generan en el idioma activo.
 
 ### Fixed
 

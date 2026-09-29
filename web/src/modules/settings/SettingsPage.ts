@@ -4,6 +4,7 @@ import { authApi, clearToken, getToken, workspacesApi } from "../../api/client";
 import { pull } from "../../sync/client";
 import { showToast } from "../../ui/kit";
 import { MembersPanel } from "./MembersPanel";
+import { locale, setLocale, t, type Locale } from "../../i18n";
 
 const ws = createQuery<
   Array<{ id: string; slug: string; name: string; role: string }> | null,
@@ -26,7 +27,7 @@ let slug = "";
 function logout(): void {
   void authApi.logout().catch(() => undefined);
   clearToken();
-  showToast("Sesión cerrada");
+  showToast(t("settings.logout_done"));
   window.dispatchEvent(new CustomEvent("hub:logout"));
 }
 
@@ -43,18 +44,27 @@ export class SettingsPage extends NixComponent {
     return html`
       <section class="page">
         <div class="page-header">
-          <h2>Ajustes</h2>
-          <button class="btn ghost" @click=${() => logout()}>Cerrar sesión</button>
+          <h2>${() => t("settings.title")}</h2>
+          <button class="btn ghost" @click=${() => logout()}>${() => t("settings.logout")}</button>
         </div>
 
-        <h3>Cuenta</h3>
+        <h3>${() => t("settings.account")}</h3>
         <div class="ws-card">
           <span><strong>${() => me.data.value?.display_name ?? "…"}</strong>
             <span class="muted">${() => me.data.value?.email ?? ""}</span></span>
-          <span class="role-badge">usuario</span>
+          <span class="role-badge">${() => t("settings.user")}</span>
         </div>
 
-        <h3>Workspaces</h3>
+        <h3>${() => t("settings.language")}</h3>
+        <div class="ws-card">
+          <select value=${() => locale.value}
+            @change=${(ev: Event) => setLocale((ev.target as HTMLSelectElement).value as Locale)}>
+            <option value="es">Español</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+
+        <h3>${() => t("settings.workspaces")}</h3>
         ${() =>
         (ws.data.value ?? []).map((w) => html`
             <div class="ws-card">
@@ -64,14 +74,14 @@ export class SettingsPage extends NixComponent {
             workspacesApi
               .exportZip(w.id, w.slug)
               .catch((e: Error) => showToast(e.message))}>
-                  Exportar
+                  ${() => t("settings.export")}
                 </button>
                 ${w.role !== "viewer"
             ? html`<button class="btn ghost" @click=${(ev: Event) => {
               const input = (ev.target as HTMLElement).parentElement
                 ?.querySelector<HTMLInputElement>("input[type=file]");
               input?.click();
-            }}>Importar vault</button>
+            }}>${() => t("settings.import")}</button>
                     <input type="file" accept=".zip" style="display:none"
                       @change=${(ev: Event) => {
                 const file = (ev.target as HTMLInputElement).files?.[0];
@@ -81,7 +91,7 @@ export class SettingsPage extends NixComponent {
                   .importZip(w.id, file)
                   .then(async (r) => {
                     showToast(
-                      `Importados ${r.imported} docs, ${r.attachments} adjuntos (${r.skipped} omitidos)`,
+                      t("settings.imported", { docs: r.imported, atts: r.attachments, skipped: r.skipped }),
                     );
                     await pull(w.id).catch(() => undefined);
                   })
@@ -95,14 +105,14 @@ export class SettingsPage extends NixComponent {
           `)}
         ${() =>
         (ws.data.value ?? []).length === 0
-          ? html`<p class="muted">Cargando workspaces…</p>`
+          ? html`<p class="muted">${() => t("settings.loading_ws")}</p>`
           : ""}
 
-        <h3>Nuevo workspace</h3>
+        <h3>${() => t("settings.new_ws")}</h3>
         <form class="settings-form" @submit=${(ev: Event) => {
         ev.preventDefault();
         if (!slug || !name) {
-          showToast("Completa el slug y el nombre");
+          showToast(t("settings.fill_fields"));
           return;
         }
         workspacesApi
@@ -111,26 +121,22 @@ export class SettingsPage extends NixComponent {
             ws.refetch();
             name = "";
             slug = "";
-            showToast("Workspace creado");
+            showToast(t("settings.ws_created"));
           })
           .catch((e: Error) => showToast(e.message));
       }}>
           <div class="field">
-            <input placeholder="slug (minúsculas)" value=${() => slug}
+            <input placeholder=${() => t("settings.slug_ph")} value=${() => slug}
               @input=${(ev: Event) => (slug = (ev.target as HTMLInputElement).value)} />
           </div>
           <div class="field">
-            <input placeholder="nombre" value=${() => name}
+            <input placeholder=${() => t("settings.name_ph")} value=${() => name}
               @input=${(ev: Event) => (name = (ev.target as HTMLInputElement).value)} />
           </div>
-          <button class="btn" type="submit">Crear</button>
+          <button class="btn" type="submit">${() => t("settings.create")}</button>
         </form>
 
-        <p class="muted" style="margin-top: 14px">
-          Roles: <strong>owner</strong> administra, <strong>editor</strong> edita,
-          <strong>viewer</strong> solo lee. El backend garantiza el permiso;
-          la UI solo lo refleja.
-        </p>
+        <p class="muted" style="margin-top: 14px">${() => t("settings.roles_hint")}</p>
       </section>
     `;
   }

@@ -5,7 +5,8 @@ import { localDocs } from "../../data/store";
 import { activeWs } from "../../data/workspace";
 import { createDocLocal } from "../../data/mutations";
 import { showPrompt, showSelect, showToast } from "../../ui/kit";
-import { DOC_TEMPLATES } from "../../data/templates";
+import { t } from "../../i18n";
+import { DOC_TEMPLATES, templateDesc, templateLabel } from "../../data/templates";
 
 // Lista de documentos leída del mirror local (funciona offline).
 export class DocsPage extends NixComponent {
@@ -13,13 +14,13 @@ export class DocsPage extends NixComponent {
     return html`
       <div class="page">
         <div class="page-header">
-          <h2>Documentos</h2>
-          <button class="btn" id="new-doc" @click=${() => void this.newDoc()}>Nuevo documento</button>
+          <h2>${() => t("docs.title")}</h2>
+          <button class="btn" id="new-doc" @click=${() => void this.newDoc()}>${() => t("docs.new")}</button>
         </div>
         <div class="list-table-wrap">
           <table class="list-table">
             <thead>
-              <tr><th>Título</th><th>Ruta</th><th>Actualizado</th></tr>
+              <tr><th>${() => t("docs.col_title")}</th><th>${() => t("docs.col_path")}</th><th>${() => t("docs.col_updated")}</th></tr>
             </thead>
             <tbody>
               ${() =>
@@ -31,7 +32,7 @@ export class DocsPage extends NixComponent {
                   </tr>`)}
               ${() =>
         localDocs.value.filter((d) => d.workspaceId === activeWs.value).length === 0
-          ? html`<tr><td colspan="3" class="empty-state">Sin documentos. Crea uno nuevo.</td></tr>`
+          ? html`<tr><td colspan="3" class="empty-state">${() => t("docs.empty")}</td></tr>`
           : ""}
             </tbody>
           </table>
@@ -43,23 +44,23 @@ export class DocsPage extends NixComponent {
   private async newDoc(): Promise<void> {
     const role = await currentRole();
     if (role === "viewer") {
-      showToast("rol viewer: solo lectura");
+      showToast(t("tasks.viewer_ro"));
       return;
     }
-    const title = await showPrompt("Nuevo documento", "Nombre del documento");
+    const title = await showPrompt(t("docs.new_title"), t("docs.new_ph"));
     if (!title) return;
     // plantilla (MVP sección 9.1): se elige tras el nombre; el esqueleto
     // es contenido Markdown inicial del documento canónico.
     const tplId = await showSelect(
-      "Plantilla",
-      DOC_TEMPLATES.map((t) => ({ value: t.id, label: t.label, description: t.description })),
+      t("docs.template"),
+      DOC_TEMPLATES.map((tpl) => ({ value: tpl.id, label: templateLabel(tpl), description: templateDesc(tpl) })),
     );
     if (tplId == null) return;
     const tpl = DOC_TEMPLATES.find((t) => t.id === tplId) ?? DOC_TEMPLATES[0];
     const path = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
     try {
       const doc = await createDocLocal(title, path, tpl.skeleton(title));
-      showToast("Documento creado");
+      showToast(t("docs.created"));
       router.navigate("/docs/" + doc.id);
     } catch (e) {
       showToast((e as Error).message);

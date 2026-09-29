@@ -1,7 +1,12 @@
 import assert from "node:assert";
 import { render } from "@deijose/nix-js-testing";
 import { test } from "vitest";
+import { setLocale } from "../../i18n";
 import { HomePage } from "./HomePage";
+
+// determinismo: el navegador de test (jsdom) reporta en-US; el producto
+// nace en ES — fijamos el locale para que los asserts sean estables.
+setLocale("es");
 
 test("muestra los tabs Entrar y Crear cuenta", () => {
   localStorage.removeItem("hub:token");

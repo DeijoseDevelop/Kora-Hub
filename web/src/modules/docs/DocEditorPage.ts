@@ -8,6 +8,7 @@ import { escapeHtml, formatDate, isOverdue, showToast } from "../../ui/kit";
 import { attachmentsApi, docsApi, type Backlink, type DocVersion } from "../../api/client";
 import { activeWs } from "../../data/workspace";
 import { lineDiff } from "./diff";
+import { t } from "../../i18n";
 
 // Vista de edición local-first: el documento se lee del mirror (100%
 // offline); el guardado escribe el mirror, reindexa y encola el sync.
@@ -24,7 +25,7 @@ export class DocEditorPage extends NixComponent {
   onMount(): void {
     const id = router.params.value.id ?? "";
     if (!id) {
-      this.status.value = "error: sin id de documento";
+      this.status.value = t("editor.no_id");
       return;
     }
     void this.load(id);
@@ -33,7 +34,7 @@ export class DocEditorPage extends NixComponent {
   private async load(id: string): Promise<void> {
     const doc = await getLocalDocById(id);
     if (!doc) {
-      this.status.value = "no encontrado";
+      this.status.value = t("editor.not_found");
       return;
     }
     this.current = { id: doc.id, path: doc.path, title: doc.title };
@@ -46,12 +47,12 @@ export class DocEditorPage extends NixComponent {
       <div class="page">
         <div class="page-header">
           <div class="doc-breadcrumb">
-            <span class="doc-name">${() => this.current?.title ?? "Documento"}</span>
-            <span class=${() => "save-indicator" + (this.status.value ? " visible" : "")}>${() => this.status.value || "Guardado"}</span>
+            <span class="doc-name">${() => this.current?.title ?? t("editor.doc")}</span>
+            <span class=${() => "save-indicator" + (this.status.value ? " visible" : "")}>${() => this.status.value || t("editor.saved")}</span>
           </div>
           <div class="doc-actions">
-            <button class="btn ghost" id="toggle-versions" @click=${() => void this.toggleVersions()}>Historial</button>
-            <button class="btn" @click=${() => this.save()}>Guardar</button>
+            <button class="btn ghost" id="toggle-versions" @click=${() => void this.toggleVersions()}>${() => t("editor.history")}</button>
+            <button class="btn" @click=${() => this.save()}>${() => t("editor.save")}</button>
           </div>
         </div>
         <div class="doc-split">
@@ -61,17 +62,17 @@ export class DocEditorPage extends NixComponent {
         ${() => this.diffOf.value ? html`
           <div class="diff-panel">
             <div class="diff-header">
-              <span>Versión del ${this.diffOf.value!.created.slice(0, 16)} → actual</span>
-              <button class="btn ghost sm" @click=${() => (this.diffOf.value = null)}>Cerrar</button>
+              <span>${() => t("editor.version_diff", { date: this.diffOf.value!.created.slice(0, 16) })}</span>
+              <button class="btn ghost sm" @click=${() => (this.diffOf.value = null)}>${() => t("editor.close")}</button>
             </div>
             <pre class="diff-body" ref=${this.diffRef}></pre>
           </div>
         ` : ""}
         ${() => this.versions.value !== null ? html`
           <div class="versions-panel">
-            <h4>Historial de versiones</h4>
+            <h4>${() => t("editor.versions")}</h4>
             ${this.versions.value!.length === 0
-          ? html`<p class="muted">Sin versiones aún — se crean al guardar cambios.</p>`
+          ? html`<p class="muted">${() => t("editor.no_versions")}</p>`
           : this.versions.value!.map((v) => html`
                   <div class="version-row" @click=${() => void this.showDiff(v)}>
                     <span>${v.created_at.slice(0, 16).replace("T", " ")}</span>
@@ -81,7 +82,7 @@ export class DocEditorPage extends NixComponent {
         ` : ""}
         ${() => this.backlinks.value !== null && this.backlinks.value!.length > 0 ? html`
           <div class="backlinks-panel">
-            <h4>Backlinks</h4>
+            <h4>${() => t("editor.backlinks")}</h4>
             ${this.backlinks.value!.map((b) => html`
               <div class="backlink-row" @click=${() => router.navigate("/docs/" + b.id)}>
                 <strong>${b.title}</strong> <span class="faint">${b.path}</span>
@@ -97,12 +98,12 @@ export class DocEditorPage extends NixComponent {
   private async uploadAttachment(file: File): Promise<string | null> {
     const ws = activeWs.value;
     if (!ws) {
-      showToast("Sin workspace activo");
+      showToast(t("editor.no_ws"));
       return null;
     }
     try {
       const att = await attachmentsApi.upload(file, ws, this.current?.id);
-      showToast(`Adjunto subido: ${att.filename}`);
+      showToast(t("editor.uploaded", { name: att.filename }));
       return att.url;
     } catch (e) {
       showToast((e as Error).message);
@@ -208,12 +209,12 @@ export class DocEditorPage extends NixComponent {
   private save(): void {
     const doc = this.current;
     if (!doc) return;
-    this.status.value = "guardando…";
+    this.status.value = t("editor.saving");
     saveDocLocal({ id: doc.id, path: doc.path, title: doc.title, content: this.editor.getDoc() })
-      .then(() => (this.status.value = "Guardado"))
+      .then(() => (this.status.value = t("editor.saved")))
       .catch(() => {
-        this.status.value = "error";
-        showToast("No se pudo guardar");
+        this.status.value = t("editor.error");
+        showToast(t("editor.save_failed"));
       });
   }
 }

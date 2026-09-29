@@ -5,6 +5,7 @@ import { tasksView } from "../../data/tasks-view";
 import { toggleTaskLocal, quickAddLocal } from "../../data/mutations";
 import { currentRole } from "../../api/role";
 import { formatDate, isOverdue, showPrompt, showToast } from "../../ui/kit";
+import { t as tr, tList, locale } from "../../i18n";
 import { viewsApi, type SavedView } from "../../api/client";
 import type { LocalTask } from "../../sync/local";
 
@@ -61,12 +62,12 @@ function applyView(v: SavedView): void {
 
 async function saveCurrentView(): Promise<void> {
   const ws = activeWs.value;
-  const name = await showPrompt("Guardar vista", "Nombre de la vista");
+  const name = await showPrompt(tr("tasks.save_view_title"), tr("tasks.save_view_ph"));
   if (!ws || !name?.trim()) return;
   try {
     await viewsApi.create(ws, name.trim(), currentFilters());
     await loadViews();
-    showToast("Vista guardada");
+    showToast(tr("tasks.view_saved"));
   } catch (e) {
     showToast((e as Error).message);
   }
@@ -78,7 +79,7 @@ async function removeView(id: string): Promise<void> {
   try {
     await viewsApi.remove(id, ws);
     await loadViews();
-    showToast("Vista eliminada");
+    showToast(tr("tasks.view_deleted"));
   } catch (e) {
     showToast((e as Error).message);
   }
@@ -92,16 +93,16 @@ function viewsBar(): NixTemplate {
       if (v) applyView(v);
       (ev.target as HTMLSelectElement).value = "";
     }}>
-        <option value="">Vistas guardadas…</option>
+        <option value="">${() => tr("tasks.views_saved")}</option>
         ${() => savedViews.value.map((v) => html`<option value=${v.id}>${v.name}</option>`)}
       </select>
-      <button class="btn ghost" @click=${() => void saveCurrentView()}>Guardar vista</button>
+      <button class="btn ghost" @click=${() => void saveCurrentView()}>${() => tr("tasks.save_view")}</button>
       <select @change=${(ev: Event) => {
       const id = (ev.target as HTMLSelectElement).value;
       if (id) void removeView(id);
       (ev.target as HTMLSelectElement).value = "";
     }}>
-        <option value="">Eliminar…</option>
+        <option value="">${() => tr("tasks.delete_view")}</option>
         ${() => savedViews.value.map((v) => html`<option value=${v.id}>${v.name}</option>`)}
       </select>
     </div>
@@ -135,12 +136,12 @@ function openDoc(docId: string): void {
 async function toggle(task: LocalTask): Promise<void> {
   const role = await currentRole();
   if (role === "viewer") {
-    showToast("rol viewer: solo lectura");
+    showToast(tr("tasks.viewer_ro"));
     return;
   }
   try {
     await toggleTaskLocal(task);
-    showToast(task.done ? "Tarea reabierta" : "Tarea completada ✓");
+    showToast(task.done ? tr("tasks.reopened") : tr("tasks.completed_ok"));
   } catch (e) {
     showToast((e as Error).message);
   }
@@ -151,12 +152,12 @@ async function quickAdd(): Promise<void> {
   if (!raw) return;
   const role = await currentRole();
   if (role === "viewer") {
-    showToast("rol viewer: solo lectura");
+    showToast(tr("tasks.viewer_ro"));
     return;
   }
   try {
-    const t = await quickAddLocal(raw);
-    showToast(t ? `Tarea creada: ${t.title}` : "No se pudo interpretar la tarea");
+    const tk = await quickAddLocal(raw);
+    showToast(tk ? tr("tasks.created", { title: tk.title }) : tr("tasks.unparseable"));
     quickAddText = "";
   } catch (e) {
     showToast((e as Error).message);
@@ -178,8 +179,8 @@ function taskBadges(t: LocalTask): NixTemplate {
     ${t.dueDate
       ? html`<span class=${"badge" + " date" + (isOverdue(t.dueDate) ? " overdue" : "")}>${formatDate(t.dueDate)}</span>`
       : ""}
-    ${t.recur ? html`<span class="badge recur" title="Recurrente">↻ ${t.recur}</span>` : ""}
-    ${isBlocked(t) ? html`<span class="badge blocked" title=${"Bloqueada por ^id:" + t.blockedBy}>bloqueada</span>` : ""}
+    ${t.recur ? html`<span class="badge recur" title=${() => tr("tasks.recurring")}>↻ ${t.recur}</span>` : ""}
+    ${isBlocked(t) ? html`<span class="badge blocked" title=${() => tr("tasks.blocked_by", { id: t.blockedBy ?? "" })}>${tr("tasks.blocked")}</span>` : ""}
     ${t.project ? html`<span class="badge project">${"@" + t.project}</span>` : ""}
     ${t.priority ? html`<span class=${"badge priority-" + t.priority}>${t.priority}</span>` : ""}
   `;
@@ -220,7 +221,7 @@ function kanbanColumn(label: string, dot: string, getter: () => LocalTask[]): Ni
               <div class="task-text">${t.title}</div>
               <div class="task-meta">
                 <div class="task-badges">${taskBadges(t)}</div>
-                <span class="source-doc" title="Abrir documento"
+                <span class="source-doc" title=${() => tr("tasks.open_doc")}
                   @click=${(ev: MouseEvent) => {
           ev.stopPropagation();
           openDoc(t.docId);
@@ -240,22 +241,20 @@ function kanbanView(): NixTemplate {
     <div class="kanban-toolbar">
       <div class="quick-add">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-faint)"><path d="M12 5v14M5 12h14"/></svg>
-        <input type="text" placeholder="Tarea rápida: 'llamar al cliente mañana @ventas !alta'"
+        <input type="text" placeholder=${() => tr("tasks.quick_ph")}
           value=${() => quickAddText}
           @input=${(ev: Event) => (quickAddText = (ev.target as HTMLInputElement).value)}
           @keydown=${(ev: KeyboardEvent) => { if (ev.key === "Enter") void quickAdd(); }} />
-        <button class="quick-add-btn" @click=${() => void quickAdd()}>Agregar</button>
+        <button class="quick-add-btn" @click=${() => void quickAdd()}>${() => tr("tasks.add")}</button>
       </div>
-      <span class="quick-add-hint">Enter para crear · #fecha @proyecto !prioridad</span>
+      <span class="quick-add-hint">${() => tr("tasks.quick_hint")}</span>
     </div>
     <div class="kanban-board">
-      ${() => kanbanColumn("Por hacer", "todo", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && !t.inProgress))}
-      ${() => kanbanColumn("En progreso", "doing", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && t.inProgress))}
-      ${() => kanbanColumn("Hecho", "done", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && t.done))}
+      ${() => kanbanColumn(tr("tasks.todo"), "todo", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && !t.inProgress))}
+      ${() => kanbanColumn(tr("tasks.doing"), "doing", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && t.inProgress))}
+      ${() => kanbanColumn(tr("tasks.done"), "done", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && t.done))}
     </div>
-    <p class="muted" style="padding: 0 20px 14px">
-      Arrastra una tarjeta para cambiar su estado · El cambio reescribe el Markdown fuente (round-trip)
-    </p>
+    <p class="muted" style="padding: 0 20px 14px">${() => tr("tasks.drag_hint")}</p>
   `;
 }
 
@@ -275,7 +274,7 @@ function tablaView(): NixTemplate {
         @change=${(ev: Event) => {
       tableParams.value = [(ev.target as HTMLSelectElement).value, tableParams.value[1]];
     }}>
-        <option value="">Todos los proyectos</option>
+        <option value="">${() => tr("tasks.all_projects")}</option>
         ${() =>
       [...new Set(localTasks.value.filter((t) => t.workspaceId === activeWs.value).map((t) => t.project).filter((p): p is string => !!p))].sort().map((p) => html`<option value=${p}>@${p}</option>`)}
       </select>
@@ -283,14 +282,14 @@ function tablaView(): NixTemplate {
         @change=${(ev: Event) => {
       tableParams.value = [tableParams.value[0], (ev.target as HTMLSelectElement).value];
     }}>
-        <option value="0">Pendientes</option>
-        <option value="1">Completadas</option>
+        <option value="0">${() => tr("tasks.pending")}</option>
+        <option value="1">${() => tr("tasks.completed")}</option>
       </select>
     </div>
     <div class="list-table-wrap">
       <table class="list-table">
         <thead>
-          <tr><th style="width: 30px"></th><th>Tarea</th><th>Fecha</th><th>Proyecto</th><th>Prioridad</th></tr>
+          <tr><th style="width: 30px"></th><th>${() => tr("tasks.col_task")}</th><th>${() => tr("tasks.col_date")}</th><th>${() => tr("tasks.col_project")}</th><th>${() => tr("tasks.col_priority")}</th></tr>
         </thead>
         <tbody>
           ${() =>
@@ -315,7 +314,7 @@ function tablaView(): NixTemplate {
                 </tr>`)}
           ${() =>
       rows.length === 0
-        ? html`<tr><td colspan="5" class="empty-state">No hay tareas que coincidan con los filtros</td></tr>`
+        ? html`<tr><td colspan="5" class="empty-state">${() => tr("tasks.empty_filter")}</td></tr>`
         : ""}
         </tbody>
       </table>
@@ -335,7 +334,7 @@ function calendarioView(): NixTemplate {
   if (startOffset < 0) startOffset = 6;
   const prevLast = new Date(y, m, 0).getDate();
   const isoToday = new Date().toISOString().split("T")[0];
-  const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+  const dayNames = tList("kit.weekdays_short");
 
   const cells: Array<{ date: string; isToday: boolean; other: boolean }> = [];
   for (let i = startOffset - 1; i >= 0; i--) {
@@ -353,10 +352,10 @@ function calendarioView(): NixTemplate {
   return html`
     <div class="view-calendar">
       <div class="calendar-header">
-        <h3>${new Date(y, m, 1).toLocaleDateString("es", { month: "long", year: "numeric" })}</h3>
+        <h3>${() => new Date(y, m, 1).toLocaleDateString(locale.value, { month: "long", year: "numeric" })}</h3>
         <div class="calendar-nav">
           <button @click=${() => shiftMonth(-1)}>←</button>
-          <button @click=${() => (calRange.value = monthRange())}>Hoy</button>
+          <button @click=${() => (calRange.value = monthRange())}>${() => tr("tasks.today")}</button>
           <button @click=${() => shiftMonth(1)}>→</button>
         </div>
       </div>
@@ -387,11 +386,11 @@ export class TasksPage extends NixComponent {
     return html`
       <div class="page">
         <div class="page-header">
-          <h2>Tareas</h2>
+          <h2>${() => tr("tasks.title")}</h2>
           <div class="tabs">
             ${(["kanban", "tabla", "calendario"] as const).map(
       (v) => html`<button class=${"tab" + (tasksView.value === v ? " active" : "")}
-                @click=${() => (tasksView.value = v)}>${v}</button>`,
+                @click=${() => (tasksView.value = v)}>${() => tr({ kanban: "app.nav.kanban", tabla: "app.nav.table", calendario: "app.nav.calendar" }[v])}</button>`,
     )}
           </div>
         </div>

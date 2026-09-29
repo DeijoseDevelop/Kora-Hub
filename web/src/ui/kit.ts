@@ -1,6 +1,8 @@
 // Kit de UI compartido: helpers puros para fechas, badges y
 // componentes imperativos (toast, modal de prompt).
 
+import { t, tList } from "../i18n";
+
 export function escapeHtml(s: unknown): string {
   if (s == null) return "";
   return String(s).replace(/[&<>"']/g, (c) =>
@@ -34,12 +36,11 @@ export function formatDate(dateStr: string): string {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  if (d.getTime() === today.getTime()) return "Hoy";
-  if (d.getTime() === tomorrow.getTime()) return "Mañana";
-  if (d.getTime() === yesterday.getTime()) return "Ayer";
+  if (d.getTime() === today.getTime()) return t("kit.today");
+  if (d.getTime() === tomorrow.getTime()) return t("kit.tomorrow");
+  if (d.getTime() === yesterday.getTime()) return t("kit.yesterday");
 
-  const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  return `${d.getDate()} ${months[d.getMonth()]}`;
+  return `${d.getDate()} ${tList("kit.months")[d.getMonth()]}`;
 }
 
 // fecha relativa -> ISO: #hoy #mañana #pasado mañana #lun..#dom #AAAA-MM-DD
@@ -125,8 +126,8 @@ export function showPrompt(title: string, placeholder: string, defaultValue = ""
         <h3>${escapeHtml(title)}</h3>
         <input type="text" placeholder="${escapeHtml(placeholder)}" />
         <div class="modal-actions">
-          <button class="ghost" data-act="cancel">Cancelar</button>
-          <button class="primary" data-act="confirm">Crear</button>
+          <button class="ghost" data-act="cancel">${escapeHtml(t("kit.cancel"))}</button>
+          <button class="primary" data-act="confirm">${escapeHtml(t("kit.create"))}</button>
         </div>
       </div>`;
     document.body.appendChild(backdrop);
@@ -169,7 +170,7 @@ export function showSelect(title: string, options: SelectOption[]): Promise<stri
         <h3>${escapeHtml(title)}</h3>
         <div class="select-list"></div>
         <div class="modal-actions">
-          <button class="ghost" data-act="cancel">Cancelar</button>
+          <button class="ghost" data-act="cancel">${escapeHtml(t("kit.cancel"))}</button>
         </div>
       </div>`;
     document.body.appendChild(backdrop);
