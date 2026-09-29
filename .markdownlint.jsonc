@@ -1,0 +1,9 @@
+// markdownlint: convenciones del repo
+// - Keep a Changelog repite ### Added por versión (MD024 solo entre hermanas)
+// - sin límite de 80 cols en Markdown (tablas y bullets largos)
+{
+  "MD024": {
+    "siblings_only": true
+  },
+  "MD013": false
+}
