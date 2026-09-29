@@ -18,6 +18,7 @@ import (
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/mcp"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/sync"
 	"github.com/gin-gonic/gin"
 )
@@ -36,15 +37,24 @@ type Server struct {
 	indexer    *indexer.Indexer
 	syncEngine *sync.Engine
 	attach     attachments.Storage
+	mcp        *mcp.Handler
 }
 
 func New(cfg *config.Config, queries *db.Queries, conn *sql.DB, logger *slog.Logger, authSvc *auth.Service, store *docs.Store, indexer *indexer.Indexer, attach attachments.Storage) *Server {
-	return &Server{
+	s := &Server{
 		cfg: cfg, queries: queries, conn: conn, logger: logger,
 		authSvc: authSvc, store: store, indexer: indexer,
 		syncEngine: sync.NewEngine(queries, conn, store, indexer),
 		attach:     attach,
 	}
+	// MCP: las tools ejecutan la misma logica interna que la REST —
+	// nunca una via paralela con menos garantias (P4: API-first).
+	s.mcp = mcp.NewHandler(mcp.Deps{
+		Queries: s.queries, Conn: s.conn, Store: s.store, Indexer: s.indexer,
+		Config: s.cfg, Logger: s.logger,
+		Resolve: s.resolveWorkspace,
+	})
+	return s
 }
 
 // Router construye el árbol de rutas.
@@ -113,6 +123,8 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 			authed.POST("/sync/push", rateLimit(60, time.Minute, userKey), s.handleSyncPush)
 
 			authed.POST("/admin/reindex", s.handleReindex)
+
+			authed.POST("/mcp", s.handleMCP)
 		}
 	}
 
