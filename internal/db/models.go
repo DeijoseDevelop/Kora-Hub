@@ -63,6 +63,7 @@ type DocVersion struct {
 	ContentHash string `json:"content_hash"`
 	CreatedAt   string `json:"created_at"`
 	CreatedBy   string `json:"created_by"`
+	StoragePath string `json:"storage_path"`
 }
 
 type DocsFt struct {

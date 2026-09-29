@@ -14,11 +14,11 @@ import (
 	"path"
 	"strings"
 
-	"github.com/oklog/ulid/v2"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/graph"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/tasks"
+	"github.com/oklog/ulid/v2"
 )
 
 // Indexer reindexa un workspace desde su árbol canónico.
@@ -148,10 +148,24 @@ func (ix *Indexer) rebuildTasks(ctx context.Context, workspaceID, docID, rel str
 }
 
 func (ix *Indexer) rebuildBacklinks(ctx context.Context, docID string, content []byte) error {
+	// los wikilinks editados fuera quedarían como residuos sin el DELETE
+	if _, err := ix.conn.ExecContext(ctx, `DELETE FROM backlinks WHERE src_doc_id = ?`, docID); err != nil {
+		return err
+	}
 	for _, link := range graph.ExtractBacklinks(string(content)) {
+		// el destino es el texto del [[wikilink]]; el ancla #seccion no
+		// forma parte del nombre del documento destino
+		dest := link.Dest
+		if i := strings.Index(dest, "#"); i >= 0 {
+			dest = dest[:i]
+		}
+		dest = strings.TrimSpace(dest)
+		if dest == "" {
+			continue
+		}
 		if _, err := ix.conn.ExecContext(ctx,
 			`INSERT OR REPLACE INTO backlinks (src_doc_id, dst_doc_id, anchor_text) VALUES (?, ?, ?)`,
-			docID, link.Dest, link.Anchor); err != nil {
+			docID, dest, link.Anchor); err != nil {
 			return err
 		}
 	}

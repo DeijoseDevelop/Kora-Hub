@@ -154,6 +154,28 @@ export const authApi = {
   status: () => api<{ has_users: boolean }>("/auth/status"),
 };
 
+export interface DocVersion {
+  id: number;
+  content_hash: string;
+  created_at: string;
+  created_by: string;
+}
+
+export interface Backlink {
+  id: string;
+  path: string;
+  title: string;
+  anchor_text: string;
+}
+
+export interface Attachment {
+  id: string;
+  filename: string;
+  mime: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 export const docsApi = {
   list: () => api<{ docs: DocSummary[] }>("/docs"),
   get: (id: string) => api<DocDetail>(`/docs/${id}`),
@@ -167,6 +189,32 @@ export const docsApi = {
       method: "PATCH",
       body: JSON.stringify({ content }),
     }),
+  versions: (id: string) => api<{ versions: DocVersion[] }>(`/docs/${id}/versions`),
+  version: (id: string, vid: number) =>
+    api<{ content: string; created_at: string }>(`/docs/${id}/versions/${vid}`),
+  backlinks: (id: string) => api<{ backlinks: Backlink[] }>(`/docs/${id}/backlinks`),
+};
+
+export const attachmentsApi = {
+  list: (workspace: string) =>
+    api<{ attachments: Attachment[] }>(`/attachments?workspace=${workspace}`),
+  upload: async (file: File, workspace: string, docId?: string): Promise<Attachment & { url: string }> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (docId) form.append("doc_id", docId);
+    const res = await fetch(`/api/v1/attachments?workspace=${workspace}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+  remove: (id: string, workspace: string) =>
+    api<void>(`/attachments/${id}?workspace=${workspace}`, { method: "DELETE" }),
 };
 
 export const tasksApi = {
@@ -192,6 +240,13 @@ export const searchApi = {
   docs: (q: string) => api<{ results: SearchResult[] }>(`/search?q=${encodeURIComponent(q)}`),
 };
 
+export interface Member {
+  user_id: string;
+  email: string;
+  display_name: string;
+  role: string;
+}
+
 export const workspacesApi = {
   create: (slug: string, name: string) =>
     api<{ id: string }>("/workspaces", {
@@ -202,4 +257,45 @@ export const workspacesApi = {
     api<{ workspaces: Array<{ id: string; slug: string; name: string; role: string }> }>(
       "/workspaces",
     ),
+  members: (id: string) => api<{ members: Member[] }>(`/workspaces/${id}/members`),
+  addMember: (id: string, email: string, role: string) =>
+    api<Member>(`/workspaces/${id}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    }),
+  setMemberRole: (id: string, uid: string, role: string) =>
+    api(`/workspaces/${id}/members/${uid}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (id: string, uid: string) =>
+    api<void>(`/workspaces/${id}/members/${uid}`, { method: "DELETE" }),
+  // export descarga el árbol canónico del workspace como ZIP (P1).
+  exportZip: async (id: string, slug: string): Promise<void> => {
+    const res = await fetch(`/api/v1/workspaces/${id}/export`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${slug}-export.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  },
+  // importZip vuelca un vault (ZIP) al workspace; devuelve contadores.
+  importZip: async (id: string, file: File): Promise<{ imported: number; attachments: number; skipped: number; indexed: number }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/v1/workspaces/${id}/import`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
 };

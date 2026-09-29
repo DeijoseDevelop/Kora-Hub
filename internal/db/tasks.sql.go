@@ -263,6 +263,113 @@ func (q *Queries) ListTasksMineToday(ctx context.Context, arg ListTasksMineToday
 	return items, nil
 }
 
+const listTasksPage = `-- name: ListTasksPage :many
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+WHERE workspace_id = ? AND done = ?
+  AND (id > ?)
+ORDER BY id ASC
+LIMIT ?
+`
+
+type ListTasksPageParams struct {
+	WorkspaceID string `json:"workspace_id"`
+	Done        int64  `json:"done"`
+	ID          string `json:"id"`
+	Limit       int64  `json:"limit"`
+}
+
+func (q *Queries) ListTasksPage(ctx context.Context, arg ListTasksPageParams) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksPage,
+		arg.WorkspaceID,
+		arg.Done,
+		arg.ID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Task{}
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.DocID,
+			&i.LineNo,
+			&i.Title,
+			&i.DueDate,
+			&i.Project,
+			&i.Priority,
+			&i.Assignee,
+			&i.Done,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.InProgress,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchTasksByTitle = `-- name: SearchTasksByTitle :many
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress FROM tasks
+WHERE workspace_id = ?1 AND title LIKE '%' || ?2 || '%'
+ORDER BY due_date ASC
+LIMIT ?3
+`
+
+type SearchTasksByTitleParams struct {
+	WorkspaceID string         `json:"workspace_id"`
+	Term        sql.NullString `json:"term"`
+	MaxResults  int64          `json:"max_results"`
+}
+
+func (q *Queries) SearchTasksByTitle(ctx context.Context, arg SearchTasksByTitleParams) ([]Task, error) {
+	rows, err := q.db.QueryContext(ctx, searchTasksByTitle, arg.WorkspaceID, arg.Term, arg.MaxResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Task{}
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.DocID,
+			&i.LineNo,
+			&i.Title,
+			&i.DueDate,
+			&i.Project,
+			&i.Priority,
+			&i.Assignee,
+			&i.Done,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.InProgress,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setTaskDone = `-- name: SetTaskDone :exec
 UPDATE tasks SET done = ?, in_progress = 0, updated_at = datetime('now')
 WHERE id = ? AND workspace_id = ?

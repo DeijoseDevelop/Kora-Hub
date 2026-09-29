@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DeijoseDevelop/Kora-Hub/internal/attachments"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/config"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
@@ -44,7 +45,23 @@ func main() {
 	authSvc := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 	store := docs.NewStore(cfg.DataDir)
 	idx := indexer.New(store, queries, conn, logger)
-	srv := server.New(cfg, queries, conn, logger, authSvc, store, idx)
+
+	attach, err := attachments.NewStorage(cfg.Storage, cfg.DataDir, &attachments.S3Config{
+		Endpoint: cfg.S3Endpoint, Bucket: cfg.S3Bucket,
+		AccessKey: cfg.S3AccessKey, SecretKey: cfg.S3SecretKey,
+		Region: cfg.S3Region, UseSSL: cfg.S3SSL,
+	})
+	if err != nil {
+		logger.Error("backend de adjuntos", "err", err)
+		os.Exit(1)
+	}
+	if s3, ok := attach.(*attachments.S3); ok {
+		if err := s3.EnsureBucket(context.Background()); err != nil {
+			logger.Error("bucket S3", "err", err)
+			os.Exit(1)
+		}
+	}
+	srv := server.New(cfg, queries, conn, logger, authSvc, store, idx, attach)
 
 	httpSrv := &http.Server{
 		Addr:              cfg.BindAddr,

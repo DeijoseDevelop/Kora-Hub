@@ -22,6 +22,8 @@ FROM docs
 WHERE workspace_id = ? AND deleted_at IS NULL
 ORDER BY updated_at DESC;
 
+
+
 -- name: SoftDeleteDoc :exec
 UPDATE docs SET deleted_at = datetime('now')
 WHERE id = ? AND workspace_id = ?;

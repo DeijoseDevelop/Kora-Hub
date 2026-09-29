@@ -58,12 +58,17 @@ func (s *Store) Delete(workspaceSlug, relPath string) error {
 }
 
 // List recorre el árbol de un workspace y devuelve los .md relativos.
+// Los directorios ocultos (.versions, .attachments) no son documentos:
+// quedan excluidos del índice.
 func (s *Store) List(workspaceSlug string) ([]string, error) {
 	root := filepath.Join(s.root, workspaceSlug)
 	var out []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.IsDir() && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
 		}
 		if !d.IsDir() && strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			rel, _ := filepath.Rel(root, path)
@@ -77,11 +82,34 @@ func (s *Store) List(workspaceSlug string) ([]string, error) {
 	return out, err
 }
 
+// WriteVersion guarda un snapshot fuera del árbol de documentos
+// (.versions/<docID>/<ulid>.md) y devuelve su ruta relativa.
+func (s *Store) WriteVersion(workspaceSlug, docID, name string, content []byte) (string, error) {
+	rel := filepath.Join(".versions", docID, name+".md")
+	if err := s.Write(workspaceSlug, rel, content); err != nil {
+		return "", err
+	}
+	return filepath.ToSlash(rel), nil
+}
+
+// ReadVersion lee un snapshot de .versions por su ruta relativa.
+func (s *Store) ReadVersion(workspaceSlug, relPath string) ([]byte, error) {
+	clean := filepath.ToSlash(filepath.Clean(relPath))
+	if !strings.HasPrefix(clean, ".versions/") {
+		return nil, fmt.Errorf("ruta fuera de .versions: %s", relPath)
+	}
+	return s.Read(workspaceSlug, clean)
+}
+
 func (s *Store) resolve(workspaceSlug, relPath string) string {
 	// saneamiento: nunca escapar de la raíz del workspace
 	clean := filepath.Clean(relPath)
-	if clean == "." {
+	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
 		return filepath.Join(s.root, workspaceSlug)
 	}
-	return filepath.Join(s.root, workspaceSlug, clean)
+	full := filepath.Join(s.root, workspaceSlug, clean)
+	if rel, err := filepath.Rel(filepath.Join(s.root, workspaceSlug), full); err != nil || strings.HasPrefix(rel, "..") {
+		return filepath.Join(s.root, workspaceSlug)
+	}
+	return full
 }

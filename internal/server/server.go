@@ -10,14 +10,16 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/attachments"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/config"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/sync"
+	"github.com/gin-gonic/gin"
 )
 
 // Version se inyecta en build con -ldflags (GoReleaser).
@@ -33,20 +35,22 @@ type Server struct {
 	store      *docs.Store
 	indexer    *indexer.Indexer
 	syncEngine *sync.Engine
+	attach     attachments.Storage
 }
 
-func New(cfg *config.Config, queries *db.Queries, conn *sql.DB, logger *slog.Logger, authSvc *auth.Service, store *docs.Store, indexer *indexer.Indexer) *Server {
+func New(cfg *config.Config, queries *db.Queries, conn *sql.DB, logger *slog.Logger, authSvc *auth.Service, store *docs.Store, indexer *indexer.Indexer, attach attachments.Storage) *Server {
 	return &Server{
 		cfg: cfg, queries: queries, conn: conn, logger: logger,
 		authSvc: authSvc, store: store, indexer: indexer,
 		syncEngine: sync.NewEngine(queries, conn, store, indexer),
+		attach:     attach,
 	}
 }
 
 // Router construye el árbol de rutas.
 func (s *Server) Router(webFS fs.FS) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
+	r.Use(gin.Logger(), gin.Recovery(), securityHeaders())
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "version": Version})
@@ -57,9 +61,10 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 
 	api := r.Group("/api/v1")
 	{
-		api.POST("/auth/register", s.handleRegister)
-		api.POST("/auth/login", s.handleLogin)
-		api.POST("/auth/refresh", s.handleRefresh)
+		// auth: 5/min por IP contra fuerza bruta (sección 11)
+		api.POST("/auth/register", rateLimit(5, time.Minute, clientIP), s.handleRegister)
+		api.POST("/auth/login", rateLimit(5, time.Minute, clientIP), s.handleLogin)
+		api.POST("/auth/refresh", rateLimit(30, time.Minute, clientIP), s.handleRefresh)
 		api.GET("/auth/status", s.handleAuthStatus)
 
 		authed := api.Group("", s.authMiddleware())
@@ -69,12 +74,24 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 
 			authed.GET("/workspaces", s.handleListWorkspaces)
 			authed.POST("/workspaces", s.handleCreateWorkspace)
+			authed.GET("/workspaces/:id", s.handleGetWorkspace)
+			authed.PATCH("/workspaces/:id", s.handlePatchWorkspace)
+			authed.DELETE("/workspaces/:id", s.handleDeleteWorkspace)
+			authed.GET("/workspaces/:id/members", s.handleListMembers)
+			authed.POST("/workspaces/:id/members", s.handleAddMember)
+			authed.PATCH("/workspaces/:id/members/:uid", s.handleUpdateMemberRole)
+			authed.DELETE("/workspaces/:id/members/:uid", s.handleRemoveMember)
+			authed.GET("/workspaces/:id/export", s.handleExportWorkspace)
+			authed.POST("/workspaces/:id/import", s.handleImportWorkspace)
 
 			authed.GET("/docs", s.handleListDocs)
 			authed.POST("/docs", s.handleCreateDoc)
 			authed.GET("/docs/:id", s.handleGetDoc)
 			authed.PATCH("/docs/:id", s.handlePatchDoc)
 			authed.DELETE("/docs/:id", s.handleDeleteDoc)
+			authed.GET("/docs/:id/versions", s.handleListDocVersions)
+			authed.GET("/docs/:id/versions/:vid", s.handleGetDocVersion)
+			authed.GET("/docs/:id/backlinks", s.handleListDocBacklinks)
 
 			authed.GET("/tasks", s.handleListTasks)
 			authed.POST("/tasks", s.handleQuickAdd)
@@ -83,8 +100,13 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 			authed.GET("/search", s.handleSearch)
 			authed.GET("/graph", s.handleGraph)
 
+			authed.POST("/attachments", s.handleUploadAttachment)
+			authed.GET("/attachments", s.handleListAttachments)
+			authed.GET("/attachments/:id", s.handleGetAttachment)
+			authed.DELETE("/attachments/:id", s.handleDeleteAttachment)
+
 			authed.GET("/sync/changes", s.handleSyncChanges)
-			authed.POST("/sync/push", s.handleSyncPush)
+			authed.POST("/sync/push", rateLimit(60, time.Minute, userKey), s.handleSyncPush)
 
 			authed.POST("/admin/reindex", s.handleReindex)
 		}

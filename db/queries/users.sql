@@ -32,3 +32,8 @@ DELETE FROM refresh_tokens WHERE expires_at < datetime('now');
 
 -- name: CountUsers :one
 SELECT COUNT(*) FROM users;
+
+-- name: ListUsers :many
+SELECT id, email, display_name, created_at
+FROM users
+ORDER BY created_at ASC;

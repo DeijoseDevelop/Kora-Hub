@@ -46,3 +46,16 @@ ORDER BY due_date ASC, done ASC;
 SELECT * FROM tasks
 WHERE workspace_id = ? AND assignee = ? AND due_date <= date('now') AND done = 0
 ORDER BY due_date ASC;
+
+-- name: SearchTasksByTitle :many
+SELECT * FROM tasks
+WHERE workspace_id = sqlc.arg(workspace_id) AND title LIKE '%' || sqlc.arg(term) || '%'
+ORDER BY due_date ASC
+LIMIT sqlc.arg(max_results);
+
+-- name: ListTasksPage :many
+SELECT * FROM tasks
+WHERE workspace_id = ? AND done = ?
+  AND (id > ?)
+ORDER BY id ASC
+LIMIT ?;

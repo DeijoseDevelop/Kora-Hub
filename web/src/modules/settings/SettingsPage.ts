@@ -1,7 +1,9 @@
 import { NixComponent, html, type NixTemplate } from "@deijose/nix-js";
 import { createQuery } from "@deijose/nix-query";
 import { authApi, clearToken, getToken, workspacesApi } from "../../api/client";
+import { pull } from "../../sync/client";
 import { showToast } from "../../ui/kit";
+import { MembersPanel } from "./MembersPanel";
 
 const ws = createQuery<
   Array<{ id: string; slug: string; name: string; role: string }> | null,
@@ -54,34 +56,65 @@ export class SettingsPage extends NixComponent {
 
         <h3>Workspaces</h3>
         ${() =>
-          (ws.data.value ?? []).map((w) => html`
+        (ws.data.value ?? []).map((w) => html`
             <div class="ws-card">
               <span><strong>${w.name}</strong> <span class="muted">${"@" + w.slug}</span></span>
-              <span class="role-badge">${w.role}</span>
+              <span>
+                <button class="btn ghost" @click=${() =>
+            workspacesApi
+              .exportZip(w.id, w.slug)
+              .catch((e: Error) => showToast(e.message))}>
+                  Exportar
+                </button>
+                ${w.role !== "viewer"
+            ? html`<button class="btn ghost" @click=${(ev: Event) => {
+              const input = (ev.target as HTMLElement).parentElement
+                ?.querySelector<HTMLInputElement>("input[type=file]");
+              input?.click();
+            }}>Importar vault</button>
+                    <input type="file" accept=".zip" style="display:none"
+                      @change=${(ev: Event) => {
+                const file = (ev.target as HTMLInputElement).files?.[0];
+                (ev.target as HTMLInputElement).value = "";
+                if (!file) return;
+                workspacesApi
+                  .importZip(w.id, file)
+                  .then(async (r) => {
+                    showToast(
+                      `Importados ${r.imported} docs, ${r.attachments} adjuntos (${r.skipped} omitidos)`,
+                    );
+                    await pull(w.id).catch(() => undefined);
+                  })
+                  .catch((e: Error) => showToast(e.message));
+              }} />`
+            : ""}
+                <span class="role-badge">${w.role}</span>
+              </span>
             </div>
+            ${w.role === "owner" ? new MembersPanel(w.id, w.name) : ""}
           `)}
         ${() =>
-          (ws.data.value ?? []).length === 0
-            ? html`<p class="muted">Cargando workspaces…</p>`
-            : ""}
+        (ws.data.value ?? []).length === 0
+          ? html`<p class="muted">Cargando workspaces…</p>`
+          : ""}
 
         <h3>Nuevo workspace</h3>
         <form class="settings-form" @submit=${(ev: Event) => {
-          ev.preventDefault();
-          if (!slug || !name) {
-            showToast("Completa el slug y el nombre");
-            return;
-          }
-          workspacesApi
-            .create(slug, name)
-            .then(() => {
-              ws.refetch();
-              name = "";
-              slug = "";
-              showToast("Workspace creado");
-            })
-            .catch((e: Error) => showToast(e.message));
-        }}>
+        ev.preventDefault();
+        if (!slug || !name) {
+          showToast("Completa el slug y el nombre");
+          return;
+        }
+        workspacesApi
+          .create(slug, name)
+          .then(() => {
+            ws.refetch();
+            name = "";
+            slug = "";
+            showToast("Workspace creado");
+          })
+          .catch((e: Error) => showToast(e.message));
+      }}>
           <div class="field">
             <input placeholder="slug (minúsculas)" value=${() => slug}
               @input=${(ev: Event) => (slug = (ev.target as HTMLInputElement).value)} />

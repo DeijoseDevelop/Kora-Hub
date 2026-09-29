@@ -149,3 +149,51 @@ export function showPrompt(title: string, placeholder: string, defaultValue = ""
     setTimeout(() => input.focus(), 30);
   });
 }
+
+// ------------------------- Modal select -------------------------
+
+export interface SelectOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+// showSelect muestra un modal con opciones clicables; devuelve el
+// value elegido o null si se cancela.
+export function showSelect(title: string, options: SelectOption[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="select-list"></div>
+        <div class="modal-actions">
+          <button class="ghost" data-act="cancel">Cancelar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+
+    const list = backdrop.querySelector(".select-list")!;
+    const cleanup = (result: string | null) => {
+      backdrop.remove();
+      resolve(result);
+    };
+    for (const opt of options) {
+      const btn = document.createElement("button");
+      btn.className = "select-option";
+      btn.innerHTML = `<strong>${escapeHtml(opt.label)}</strong>` +
+        (opt.description ? `<span class="muted">${escapeHtml(opt.description)}</span>` : "");
+      btn.addEventListener("click", () => cleanup(opt.value));
+      list.appendChild(btn);
+    }
+    backdrop.querySelector('[data-act="cancel"]')!.addEventListener("click", () => cleanup(null));
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) cleanup(null);
+    });
+    backdrop.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") cleanup(null);
+    });
+    setTimeout(() => (list.querySelector("button") as HTMLButtonElement | null)?.focus(), 30);
+  });
+}

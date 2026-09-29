@@ -38,6 +38,56 @@ func (q *Queries) ListBacklinksForGraph(ctx context.Context, workspaceID string)
 	return items, nil
 }
 
+const listBacklinksTo = `-- name: ListBacklinksTo :many
+SELECT src.id, src.path, src.title, b.anchor_text
+FROM backlinks b
+JOIN docs src ON src.id = b.src_doc_id AND src.deleted_at IS NULL
+JOIN docs dst ON dst.id = ? AND dst.workspace_id = ?
+WHERE LOWER(dst.title) = LOWER(b.dst_doc_id)
+   OR LOWER(dst.path) = LOWER(b.dst_doc_id)
+   OR LOWER(dst.path) = LOWER(b.dst_doc_id) || '.md'
+`
+
+type ListBacklinksToParams struct {
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+}
+
+type ListBacklinksToRow struct {
+	ID         string `json:"id"`
+	Path       string `json:"path"`
+	Title      string `json:"title"`
+	AnchorText string `json:"anchor_text"`
+}
+
+func (q *Queries) ListBacklinksTo(ctx context.Context, arg ListBacklinksToParams) ([]ListBacklinksToRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBacklinksTo, arg.ID, arg.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBacklinksToRow{}
+	for rows.Next() {
+		var i ListBacklinksToRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Path,
+			&i.Title,
+			&i.AnchorText,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDocsForGraph = `-- name: ListDocsForGraph :many
 SELECT id, title FROM docs
 WHERE workspace_id = ? AND deleted_at IS NULL

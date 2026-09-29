@@ -5,14 +5,21 @@ import { getLocalDocById, saveDocLocal } from "../../data/mutations";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { parseLine } from "../../tasks/parser";
 import { escapeHtml, formatDate, isOverdue, showToast } from "../../ui/kit";
+import { attachmentsApi, docsApi, type Backlink, type DocVersion } from "../../api/client";
+import { activeWs } from "../../data/workspace";
+import { lineDiff } from "./diff";
 
 // Vista de edición local-first: el documento se lee del mirror (100%
 // offline); el guardado escribe el mirror, reindexa y encola el sync.
 export class DocEditorPage extends NixComponent {
-  private editor = new MarkdownEditor("", (text) => this.updatePreview(text));
+  private editor = new MarkdownEditor("", (text) => this.updatePreview(text), (f) => this.uploadAttachment(f));
   private status = signal("");
   private current: { id: string; path: string; title: string } | null = null;
   private previewRef = ref<HTMLDivElement>();
+  private versions = signal<DocVersion[] | null>(null);
+  private diffOf = signal<{ vid: number; created: string } | null>(null);
+  private diffRef = ref<HTMLElement>();
+  private backlinks = signal<Backlink[] | null>(null);
 
   onMount(): void {
     const id = router.params.value.id ?? "";
@@ -42,14 +49,107 @@ export class DocEditorPage extends NixComponent {
             <span class="doc-name">${() => this.current?.title ?? "Documento"}</span>
             <span class=${() => "save-indicator" + (this.status.value ? " visible" : "")}>${() => this.status.value || "Guardado"}</span>
           </div>
-          <button class="btn" @click=${() => this.save()}>Guardar</button>
+          <div class="doc-actions">
+            <button class="btn ghost" id="toggle-versions" @click=${() => void this.toggleVersions()}>Historial</button>
+            <button class="btn" @click=${() => this.save()}>Guardar</button>
+          </div>
         </div>
         <div class="doc-split">
           ${this.editor}
           <div class="doc-preview" ref=${this.previewRef}></div>
         </div>
+        ${() => this.diffOf.value ? html`
+          <div class="diff-panel">
+            <div class="diff-header">
+              <span>Versión del ${this.diffOf.value!.created.slice(0, 16)} → actual</span>
+              <button class="btn ghost sm" @click=${() => (this.diffOf.value = null)}>Cerrar</button>
+            </div>
+            <pre class="diff-body" ref=${this.diffRef}></pre>
+          </div>
+        ` : ""}
+        ${() => this.versions.value !== null ? html`
+          <div class="versions-panel">
+            <h4>Historial de versiones</h4>
+            ${this.versions.value!.length === 0
+          ? html`<p class="muted">Sin versiones aún — se crean al guardar cambios.</p>`
+          : this.versions.value!.map((v) => html`
+                  <div class="version-row" @click=${() => void this.showDiff(v)}>
+                    <span>${v.created_at.slice(0, 16).replace("T", " ")}</span>
+                    <span class="faint mono">${v.content_hash.slice(0, 8)}</span>
+                  </div>`)}
+          </div>
+        ` : ""}
+        ${() => this.backlinks.value !== null && this.backlinks.value!.length > 0 ? html`
+          <div class="backlinks-panel">
+            <h4>Backlinks</h4>
+            ${this.backlinks.value!.map((b) => html`
+              <div class="backlink-row" @click=${() => router.navigate("/docs/" + b.id)}>
+                <strong>${b.title}</strong> <span class="faint">${b.path}</span>
+              </div>`)}
+          </div>
+        ` : ""}
       </div>
     `;
+  }
+
+  // uploadAttachment sube el archivo al backend (requiere conexión; el
+  // sync offline de binarios está pendiente — §10) e inserta el enlace.
+  private async uploadAttachment(file: File): Promise<string | null> {
+    const ws = activeWs.value;
+    if (!ws) {
+      showToast("Sin workspace activo");
+      return null;
+    }
+    try {
+      const att = await attachmentsApi.upload(file, ws, this.current?.id);
+      showToast(`Adjunto subido: ${att.filename}`);
+      return att.url;
+    } catch (e) {
+      showToast((e as Error).message);
+      return null;
+    }
+  }
+
+  private async toggleVersions(): Promise<void> {
+    if (this.versions.value !== null) {
+      this.versions.value = null;
+      this.diffOf.value = null;
+      return;
+    }
+    if (!this.current) return;
+    try {
+      const res = await docsApi.versions(this.current.id);
+      this.versions.value = res.versions;
+      const bl = await docsApi.backlinks(this.current.id);
+      this.backlinks.value = bl.backlinks;
+    } catch (e) {
+      showToast((e as Error).message);
+    }
+  }
+
+  // showDiff muestra el diff línea a línea entre el snapshot y el
+  // contenido actual del editor.
+  private async showDiff(v: DocVersion): Promise<void> {
+    if (!this.current) return;
+    try {
+      const res = await docsApi.version(this.current.id, v.id);
+      const diff = lineDiff(res.content, this.editor.getDoc());
+      this.diffOf.value = { vid: v.id, created: v.created_at };
+      // el ref se monta tras el render del signal; deferir el innerHTML
+      queueMicrotask(() => {
+        const el = this.diffRef.el;
+        if (!el) return;
+        el.innerHTML = diff
+          .map((l) => {
+            const cls = l.op === "add" ? "diff-add" : l.op === "del" ? "diff-del" : "";
+            const sign = l.op === "add" ? "+" : l.op === "del" ? "-" : " ";
+            return `<span class="${cls}">${sign} ${escapeHtml(l.text)}</span>`;
+          })
+          .join("\n");
+      });
+    } catch (e) {
+      showToast((e as Error).message);
+    }
   }
 
   private updatePreview(md: string): void {

@@ -132,6 +132,47 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 	return i, err
 }
 
+const listUsers = `-- name: ListUsers :many
+SELECT id, email, display_name, created_at
+FROM users
+ORDER BY created_at ASC
+`
+
+type ListUsersRow struct {
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	DisplayName string `json:"display_name"`
+	CreatedAt   string `json:"created_at"`
+}
+
+func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersRow{}
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.DisplayName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeRefreshToken = `-- name: RevokeRefreshToken :exec
 UPDATE refresh_tokens SET revoked_at = datetime('now')
 WHERE id = ?

@@ -13,13 +13,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gin-gonic/gin"
-	"github.com/oklog/ulid/v2"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/attachments"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/config"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
+	"github.com/gin-gonic/gin"
+	"github.com/oklog/ulid/v2"
 )
 
 func testServer(t *testing.T) (*Server, string) {
@@ -56,9 +57,10 @@ func testServer(t *testing.T) (*Server, string) {
 
 	store := docs.NewStore(dir)
 	idx := indexer.New(store, queries, conn, logger)
-	cfg := &config.Config{AccessTTL: 15 * 60 * 1e9, RefreshTTL: 30 * 24 * 3600 * 1e9}
+	cfg := &config.Config{DataDir: dir, MaxUploadMB: 20, AccessTTL: 15 * 60 * 1e9, RefreshTTL: 30 * 24 * 3600 * 1e9}
 	authSvc := auth.NewService("test-secret", cfg.AccessTTL, cfg.RefreshTTL)
-	return New(cfg, queries, conn, logger, authSvc, store, idx), userID
+	attach := attachments.NewLocal(filepath.Join(dir, "attachments"))
+	return New(cfg, queries, conn, logger, authSvc, store, idx, attach), userID
 }
 
 func TestQuickAddAppendsToInboxAndIndexes(t *testing.T) {

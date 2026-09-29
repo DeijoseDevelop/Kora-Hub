@@ -17,11 +17,13 @@ export class MarkdownEditor extends NixComponent {
   private view: EditorView | null = null;
   private initial: string;
   private onChange?: (text: string) => void;
+  private onFile?: (file: File) => Promise<string | null>;
 
-  constructor(initial: string, onChange?: (text: string) => void) {
+  constructor(initial: string, onChange?: (text: string) => void, onFile?: (file: File) => Promise<string | null>) {
     super();
     this.initial = initial;
     this.onChange = onChange;
+    this.onFile = onFile;
   }
 
   render(): NixTemplate {
@@ -46,10 +48,38 @@ export class MarkdownEditor extends NixComponent {
             this.onChange?.(u.state.doc.toString());
           }
         }),
+        // drag & drop / pegar adjuntos (sección 9.1): se suben al
+        // backend y se inserta el enlace Markdown en la posición del
+        // drop o del cursor
+        EditorView.domEventHandlers({
+          drop: (ev, view) => {
+            const file = ev.dataTransfer?.files?.[0];
+            if (!file || !this.onFile) return;
+            ev.preventDefault();
+            const pos = view.posAtCoords({ x: ev.clientX, y: ev.clientY }) ?? view.state.selection.main.head;
+            void this.insertAt(view, file, pos);
+          },
+          paste: (ev, view) => {
+            const file = ev.clipboardData?.files?.[0];
+            if (!file || !this.onFile) return;
+            ev.preventDefault();
+            void this.insertAt(view, file, view.state.selection.main.head);
+          },
+        }),
       ],
     });
     this.view = new EditorView({ state, parent: this.container.el });
     return () => this.view?.destroy();
+  }
+
+  // insertAt sube el archivo e inserta el enlace Markdown devuelto
+  // (el handler devuelve la URL absoluta de la API del adjunto).
+  private async insertAt(view: EditorView, file: File, pos: number): Promise<void> {
+    const url = await this.onFile?.(file);
+    if (!url) return;
+    const isImage = file.type.startsWith("image/");
+    const link = (isImage ? `![${file.name}](` : `[${file.name}](`) + url + ")";
+    view.dispatch({ changes: { from: pos, insert: link } });
   }
 
   setDoc(content: string): void {

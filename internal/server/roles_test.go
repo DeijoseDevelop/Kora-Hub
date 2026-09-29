@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/oklog/ulid/v2"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/oklog/ulid/v2"
 )
 
 // TestRoleEnforcement: un viewer puede leer pero las mutaciones dan 403.
@@ -101,7 +101,7 @@ func TestProjections(t *testing.T) {
 
 	// doc con tareas para sembrar el índice
 	if err := srv.store.Write("ws", "proyecto.md", []byte(
-		"# Proyecto\n\n- [ ] A vencer #2026-09-01 @proyecto !alta ~alice\n- [ ] B vencida #2020-01-01 @proyecto ~bob\n- [x] C hecha #2026-09-05\n",
+		"# Proyecto\n\n- [ ] A vencer #2099-01-01 @proyecto !alta ~alice\n- [ ] B vencida #2020-01-01 @proyecto ~bob\n- [x] C hecha #2026-09-05\n",
 	)); err != nil {
 		t.Fatal(err)
 	}
@@ -142,8 +142,8 @@ func TestProjections(t *testing.T) {
 	// calendario por rango
 	w = get("/api/v1/tasks?vista=calendario&desde=2026-09-01&hasta=2026-09-30")
 	json.Unmarshal(w.Body.Bytes(), &open)
-	if len(open.Tasks) != 2 {
-		t.Fatalf("calendario = %d, esperaba 2 (A y C)", len(open.Tasks))
+	if len(open.Tasks) != 1 {
+		t.Fatalf("calendario = %d, esperaba 1 (solo C)", len(open.Tasks))
 	}
 
 	// mis tareas hoy: ninguna con due <= hoy sin done (B está vencida pero ~bob)

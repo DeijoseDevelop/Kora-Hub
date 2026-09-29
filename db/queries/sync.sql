@@ -29,15 +29,20 @@ VALUES (?, ?, ?);
 SELECT 1 FROM sync_commands WHERE idempotency_key = ? AND workspace_id = ?;
 
 -- name: InsertDocVersion :exec
-INSERT INTO doc_versions (doc_id, content_hash, created_at, created_by)
-VALUES (?, ?, datetime('now'), ?);
+INSERT INTO doc_versions (doc_id, content_hash, created_at, created_by, storage_path)
+VALUES (?, ?, datetime('now'), ?, ?);
 
 -- name: GetDocVersions :many
-SELECT doc_id, content_hash, created_at, created_by
+SELECT id, doc_id, content_hash, created_at, created_by, storage_path
 FROM doc_versions
 WHERE doc_id = ?
-ORDER BY created_at DESC
+ORDER BY id DESC
 LIMIT ?;
+
+-- name: GetDocVersionByID :one
+SELECT id, doc_id, content_hash, created_at, created_by, storage_path
+FROM doc_versions
+WHERE id = ?;
 
 -- name: SetDocUpdatedAt :exec
 UPDATE docs SET updated_at = ?

@@ -16,16 +16,17 @@ import (
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/indexer"
+	"github.com/oklog/ulid/v2"
 )
 
 // Change es un evento del change_log con su snapshot.
 type Change struct {
-	Seq       int64          `json:"seq"`
-	Entity    string         `json:"entity"`
-	EntityID  string         `json:"entity_id"`
-	Op        string         `json:"op"` // upsert | delete
-	Doc       *DocSnapshot   `json:"doc,omitempty"`
-	CreatedAt string         `json:"created_at"`
+	Seq       int64        `json:"seq"`
+	Entity    string       `json:"entity"`
+	EntityID  string       `json:"entity_id"`
+	Op        string       `json:"op"` // upsert | delete
+	Doc       *DocSnapshot `json:"doc,omitempty"`
+	CreatedAt string       `json:"created_at"`
 }
 
 // DocSnapshot es el estado completo de un documento para aplicar en el
@@ -160,15 +161,19 @@ func (e *Engine) applyDocUpsert(ctx context.Context, wsID, wsSlug string, cmd Pu
 
 	existing, err := e.queries.GetDocByPath(ctx, db.GetDocByPathParams{WorkspaceID: wsID, Path: cmd.Path})
 	if err == nil && cmd.UpdatedAt != "" && existing.UpdatedAt > cmd.UpdatedAt {
-		// LWW: el servidor gana; la versión perdedora se conserva en
-		// doc_versions (recuperable, nunca destructivo).
+		// LWW: el servidor gana; la versión perdedora se conserva como
+		// snapshot en .versions/ (recuperable, nunca destructivo).
 		ws, err := e.queries.GetWorkspaceByID(ctx, wsID)
 		if err != nil {
 			return err
 		}
 		hash := docs.ContentHash([]byte(cmd.Content))
+		vpath, err := e.store.WriteVersion(ws.Slug, existing.ID, ulid.Make().String(), []byte(cmd.Content))
+		if err != nil {
+			return err
+		}
 		if err := e.queries.InsertDocVersion(ctx, db.InsertDocVersionParams{
-			DocID: existing.ID, ContentHash: hash, CreatedBy: ws.OwnerID,
+			DocID: existing.ID, ContentHash: hash, CreatedBy: ws.OwnerID, StoragePath: vpath,
 		}); err != nil {
 			return err
 		}

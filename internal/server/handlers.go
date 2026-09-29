@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/oklog/ulid/v2"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/search"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/tasks"
+	"github.com/gin-gonic/gin"
+	"github.com/oklog/ulid/v2"
 )
 
 // -------------------------------- Auth --------------------------------
@@ -272,21 +272,83 @@ func (s *Server) handleCreateDoc(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"id": doc.ID, "title": doc.Title, "content_hash": doc.ContentHash})
 }
 
+// handleListDocs soporta paginación por cursor (sección 4.2):
+// ?cursor=<updated_at>|<id> + ?limit=N → next_cursor en la respuesta.
+// Sin parámetros devuelve la lista completa (compatibilidad).
 func (s *Server) handleListDocs(c *gin.Context) {
 	userID := c.GetString("user_id")
 	ws, ok := s.workspaceOf(c, userID)
 	if !ok {
 		return
 	}
-	rows, err := s.queries.ListDocsByWorkspace(c, ws.id)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "0"))
+	cursor := c.Query("cursor")
+	if limit <= 0 && cursor == "" {
+		rows, err := s.queries.ListDocsByWorkspace(c, ws.id)
+		if err != nil {
+			s.fail(c, http.StatusInternalServerError, "internal", "error de base de datos")
+			return
+		}
+		if rows == nil {
+			rows = []db.Doc{}
+		}
+		c.JSON(http.StatusOK, gin.H{"docs": rows})
+		return
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	afterTS := "9999-12-31 23:59:59"
+	var afterRowid int64 = 1 << 62 // cursor vacío = primera página
+	if cursor != "" {
+		parts := strings.SplitN(cursor, "|", 2)
+		if len(parts) != 2 {
+			s.fail(c, http.StatusBadRequest, "bad_request", "cursor inválido")
+			return
+		}
+		afterTS = parts[0]
+		if rid, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
+			afterRowid = rid
+		}
+	}
+	// rowid es monótono por inserción: cursor estable incluso con
+	// updated_at idénticos (sqlc no expone columnas implícitas: SQL directo)
+	rows, err := s.conn.QueryContext(c, `
+		SELECT rowid AS cursor_id, id, path, title, updated_at
+		FROM docs
+		WHERE workspace_id = ? AND deleted_at IS NULL
+		  AND (updated_at < ? OR (updated_at = ? AND rowid < ?))
+		ORDER BY updated_at DESC, rowid DESC
+		LIMIT ?`, ws.id, afterTS, afterTS, afterRowid, int64(limit)+1)
 	if err != nil {
 		s.fail(c, http.StatusInternalServerError, "internal", "error de base de datos")
 		return
 	}
-	if rows == nil {
-		rows = []db.Doc{}
+	type docRow struct {
+		CursorID  int64  `json:"cursor_id"`
+		ID        string `json:"id"`
+		Path      string `json:"path"`
+		Title     string `json:"title"`
+		UpdatedAt string `json:"updated_at"`
 	}
-	c.JSON(http.StatusOK, gin.H{"docs": rows})
+	out := []docRow{}
+	for rows.Next() {
+		var d docRow
+		if err := rows.Scan(&d.CursorID, &d.ID, &d.Path, &d.Title, &d.UpdatedAt); err != nil {
+			rows.Close()
+			s.fail(c, http.StatusInternalServerError, "internal", "error de base de datos")
+			return
+		}
+		out = append(out, d)
+	}
+	rows.Close()
+	resp := gin.H{"docs": out}
+	if len(out) > limit {
+		last := out[limit-1]
+		resp["next_cursor"] = last.UpdatedAt + "|" + strconv.FormatInt(last.CursorID, 10)
+		resp["docs"] = out[:limit]
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (s *Server) handleGetDoc(c *gin.Context) {
@@ -334,6 +396,17 @@ func (s *Server) handlePatchDoc(c *gin.Context) {
 		s.fail(c, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	// snapshot de la versión anterior en .versions/ (P1: los archivos
+	// son la verdad; doc_versions solo indexa los snapshots).
+	if prev, err := s.store.Read(ws.slug, doc.Path); err == nil && string(prev) != req.Content {
+		vpath, verr := s.store.WriteVersion(ws.slug, doc.ID, ulid.Make().String(), prev)
+		if verr == nil {
+			_ = s.queries.InsertDocVersion(c, db.InsertDocVersionParams{
+				DocID: doc.ID, ContentHash: doc.ContentHash,
+				CreatedBy: userID, StoragePath: vpath,
+			})
+		}
+	}
 	if err := s.store.Write(ws.slug, doc.Path, []byte(req.Content)); err != nil {
 		s.fail(c, http.StatusInternalServerError, "internal", "no se pudo escribir el documento")
 		return
@@ -351,10 +424,97 @@ func (s *Server) handlePatchDoc(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"id": updated.ID, "content_hash": updated.ContentHash})
 }
 
+// ---------------------------- Doc versions -----------------------------
+
+// handleListDocVersions lista los snapshots de un documento (más
+// reciente primero). Cualquier miembro del workspace puede leerlos.
+func (s *Server) handleListDocVersions(c *gin.Context) {
+	userID := c.GetString("user_id")
+	ws, ok := s.workspaceOf(c, userID)
+	if !ok {
+		return
+	}
+	doc, err := s.queries.GetDocByID(c, db.GetDocByIDParams{ID: c.Param("id"), WorkspaceID: ws.id})
+	if err != nil {
+		s.fail(c, http.StatusNotFound, "not_found", "documento no encontrado")
+		return
+	}
+	limit := 50
+	if l, err := strconv.Atoi(c.DefaultQuery("limit", "50")); err == nil && l > 0 && l <= 200 {
+		limit = l
+	}
+	rows, err := s.queries.GetDocVersions(c, db.GetDocVersionsParams{DocID: doc.ID, Limit: int64(limit)})
+	if err != nil {
+		s.fail(c, http.StatusInternalServerError, "internal", "error de base de datos")
+		return
+	}
+	if rows == nil {
+		rows = []db.DocVersion{}
+	}
+	c.JSON(http.StatusOK, gin.H{"versions": rows})
+}
+
+// handleGetDocVersion devuelve el contenido de un snapshot para el
+// diff (la UI calcula las diferencias contra el contenido actual).
+func (s *Server) handleGetDocVersion(c *gin.Context) {
+	userID := c.GetString("user_id")
+	ws, ok := s.workspaceOf(c, userID)
+	if !ok {
+		return
+	}
+	doc, err := s.queries.GetDocByID(c, db.GetDocByIDParams{ID: c.Param("id"), WorkspaceID: ws.id})
+	if err != nil {
+		s.fail(c, http.StatusNotFound, "not_found", "documento no encontrado")
+		return
+	}
+	vid, err := strconv.ParseInt(c.Param("vid"), 10, 64)
+	if err != nil {
+		s.fail(c, http.StatusBadRequest, "bad_request", "id de versión inválido")
+		return
+	}
+	v, err := s.queries.GetDocVersionByID(c, vid)
+	if err != nil || v.DocID != doc.ID {
+		s.fail(c, http.StatusNotFound, "not_found", "versión no encontrada")
+		return
+	}
+	content, err := s.store.ReadVersion(ws.slug, v.StoragePath)
+	if err != nil {
+		s.fail(c, http.StatusNotFound, "not_found", "snapshot no disponible")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id": v.ID, "doc_id": doc.ID, "content": string(content),
+		"content_hash": v.ContentHash, "created_at": v.CreatedAt,
+	})
+}
+
+// handleListDocBacklinks devuelve los documentos que enlazan a este
+// (la tabla backlinks la puebla el indexer a partir de [[wikilinks]]).
+func (s *Server) handleListDocBacklinks(c *gin.Context) {
+	userID := c.GetString("user_id")
+	ws, ok := s.workspaceOf(c, userID)
+	if !ok {
+		return
+	}
+	doc, err := s.queries.GetDocByID(c, db.GetDocByIDParams{ID: c.Param("id"), WorkspaceID: ws.id})
+	if err != nil {
+		s.fail(c, http.StatusNotFound, "not_found", "documento no encontrado")
+		return
+	}
+	rows, err := s.queries.ListBacklinksTo(c, db.ListBacklinksToParams{ID: doc.ID, WorkspaceID: ws.id})
+	if err != nil {
+		s.fail(c, http.StatusInternalServerError, "internal", "error de base de datos")
+		return
+	}
+	if rows == nil {
+		rows = []db.ListBacklinksToRow{}
+	}
+	c.JSON(http.StatusOK, gin.H{"backlinks": rows})
+}
+
 // ------------------------------- Tasks --------------------------------
 // Las tareas son proyecciones del índice; PATCH reescribe la línea en
 // el Markdown fuente (round-trip, sección 6.2) y reindexa.
-
 
 // TaskDTO es la representación JSON pública de una tarea: el backend
 // serializa los campos nullable como string|null (nunca como el objeto
@@ -379,13 +539,13 @@ func toTaskDTO(t db.Task) TaskDTO {
 	return TaskDTO{
 		ID: t.ID, WorkspaceID: t.WorkspaceID, DocID: t.DocID,
 		LineNo: t.LineNo, Title: t.Title,
-		DueDate:   nsPtr(t.DueDate),
-		Project:   nsPtr(t.Project),
-		Priority:  nsPtr(t.Priority),
-		Assignee:  nsPtr(t.Assignee),
-		Done:      t.Done,
+		DueDate:    nsPtr(t.DueDate),
+		Project:    nsPtr(t.Project),
+		Priority:   nsPtr(t.Priority),
+		Assignee:   nsPtr(t.Assignee),
+		Done:       t.Done,
 		InProgress: t.InProgress,
-		CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
+		CreatedAt:  t.CreatedAt, UpdatedAt: t.UpdatedAt,
 	}
 }
 
@@ -544,6 +704,17 @@ func (s *Server) handlePatchTask(c *gin.Context) {
 
 // ------------------------------- Search --------------------------------
 
+// SearchResult unifica los tipos buscables (sección 4.2: ?tipo=).
+type SearchResult struct {
+	Tipo  string `json:"tipo"` // doc | tarea | adjunto
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Path  string `json:"path,omitempty"`
+	DocID string `json:"doc_id,omitempty"`
+}
+
+// handleSearch filtra por ?tipo=doc|tarea|adjunto; sin tipo busca en
+// todo (docs por FTS5, tareas y adjuntos por LIKE).
 func (s *Server) handleSearch(c *gin.Context) {
 	userID := c.GetString("user_id")
 	ws, ok := s.workspaceOf(c, userID)
@@ -551,16 +722,48 @@ func (s *Server) handleSearch(c *gin.Context) {
 		return
 	}
 	q := c.Query("q")
+	tipo := c.DefaultQuery("tipo", "")
 	limit := 20
 	if l, err := strconv.Atoi(c.DefaultQuery("limit", "20")); err == nil && l > 0 && l <= 100 {
 		limit = l
 	}
-	results, err := search.SearchDocs(c, s.conn, ws.id, q, limit)
-	if err != nil {
-		s.fail(c, http.StatusInternalServerError, "internal", "error de búsqueda")
-		return
+	out := []SearchResult{}
+
+	if tipo == "" || tipo == "doc" {
+		docs, err := search.SearchDocs(c, s.conn, ws.id, q, limit)
+		if err != nil {
+			s.fail(c, http.StatusInternalServerError, "internal", "error de búsqueda")
+			return
+		}
+		for _, d := range docs {
+			out = append(out, SearchResult{Tipo: "doc", ID: d.ID, Title: d.Title, Path: d.Path})
+		}
 	}
-	c.JSON(http.StatusOK, gin.H{"results": results})
+	if tipo == "" || tipo == "tarea" {
+		rows, err := s.queries.SearchTasksByTitle(c, db.SearchTasksByTitleParams{
+			WorkspaceID: ws.id, Term: sql.NullString{String: q, Valid: true}, MaxResults: int64(limit),
+		})
+		if err != nil {
+			s.fail(c, http.StatusInternalServerError, "internal", "error de búsqueda")
+			return
+		}
+		for _, t := range rows {
+			out = append(out, SearchResult{Tipo: "tarea", ID: t.ID, Title: t.Title, DocID: t.DocID})
+		}
+	}
+	if tipo == "" || tipo == "adjunto" {
+		rows, err := s.queries.SearchAttachmentsByName(c, db.SearchAttachmentsByNameParams{
+			WorkspaceID: ws.id, Term: sql.NullString{String: q, Valid: true}, MaxResults: int64(limit),
+		})
+		if err != nil {
+			s.fail(c, http.StatusInternalServerError, "internal", "error de búsqueda")
+			return
+		}
+		for _, a := range rows {
+			out = append(out, SearchResult{Tipo: "adjunto", ID: a.ID, Title: a.Filename})
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"results": out})
 }
 
 // ----------------------------- Reindex (admin) --------------------------
@@ -667,7 +870,6 @@ func boolToInt64(b bool) int64 {
 	}
 	return 0
 }
-
 
 // createPersonalWorkspace crea (o reutiliza) el workspace "Personal" del
 // usuario. Devuelve nil si falla (el registro no debe romperse por esto).

@@ -53,11 +53,31 @@ func (q *Queries) GetChangesAfter(ctx context.Context, arg GetChangesAfterParams
 	return items, nil
 }
 
+const getDocVersionByID = `-- name: GetDocVersionByID :one
+SELECT id, doc_id, content_hash, created_at, created_by, storage_path
+FROM doc_versions
+WHERE id = ?
+`
+
+func (q *Queries) GetDocVersionByID(ctx context.Context, id int64) (DocVersion, error) {
+	row := q.db.QueryRowContext(ctx, getDocVersionByID, id)
+	var i DocVersion
+	err := row.Scan(
+		&i.ID,
+		&i.DocID,
+		&i.ContentHash,
+		&i.CreatedAt,
+		&i.CreatedBy,
+		&i.StoragePath,
+	)
+	return i, err
+}
+
 const getDocVersions = `-- name: GetDocVersions :many
-SELECT doc_id, content_hash, created_at, created_by
+SELECT id, doc_id, content_hash, created_at, created_by, storage_path
 FROM doc_versions
 WHERE doc_id = ?
-ORDER BY created_at DESC
+ORDER BY id DESC
 LIMIT ?
 `
 
@@ -66,27 +86,22 @@ type GetDocVersionsParams struct {
 	Limit int64  `json:"limit"`
 }
 
-type GetDocVersionsRow struct {
-	DocID       string `json:"doc_id"`
-	ContentHash string `json:"content_hash"`
-	CreatedAt   string `json:"created_at"`
-	CreatedBy   string `json:"created_by"`
-}
-
-func (q *Queries) GetDocVersions(ctx context.Context, arg GetDocVersionsParams) ([]GetDocVersionsRow, error) {
+func (q *Queries) GetDocVersions(ctx context.Context, arg GetDocVersionsParams) ([]DocVersion, error) {
 	rows, err := q.db.QueryContext(ctx, getDocVersions, arg.DocID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetDocVersionsRow{}
+	items := []DocVersion{}
 	for rows.Next() {
-		var i GetDocVersionsRow
+		var i DocVersion
 		if err := rows.Scan(
+			&i.ID,
 			&i.DocID,
 			&i.ContentHash,
 			&i.CreatedAt,
 			&i.CreatedBy,
+			&i.StoragePath,
 		); err != nil {
 			return nil, err
 		}
@@ -137,18 +152,24 @@ func (q *Queries) InsertChange(ctx context.Context, arg InsertChangeParams) (Ins
 }
 
 const insertDocVersion = `-- name: InsertDocVersion :exec
-INSERT INTO doc_versions (doc_id, content_hash, created_at, created_by)
-VALUES (?, ?, datetime('now'), ?)
+INSERT INTO doc_versions (doc_id, content_hash, created_at, created_by, storage_path)
+VALUES (?, ?, datetime('now'), ?, ?)
 `
 
 type InsertDocVersionParams struct {
 	DocID       string `json:"doc_id"`
 	ContentHash string `json:"content_hash"`
 	CreatedBy   string `json:"created_by"`
+	StoragePath string `json:"storage_path"`
 }
 
 func (q *Queries) InsertDocVersion(ctx context.Context, arg InsertDocVersionParams) error {
-	_, err := q.db.ExecContext(ctx, insertDocVersion, arg.DocID, arg.ContentHash, arg.CreatedBy)
+	_, err := q.db.ExecContext(ctx, insertDocVersion,
+		arg.DocID,
+		arg.ContentHash,
+		arg.CreatedBy,
+		arg.StoragePath,
+	)
 	return err
 }
 

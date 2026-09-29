@@ -41,9 +41,10 @@ export async function saveDocLocal(doc: { id: string; path: string; title: strin
 
 // createDocLocal: crea el documento en el mirror (funciona offline) y lo
 // encola para sincronizar. Devuelve el doc local (su id es la navegación).
-export async function createDocLocal(title: string, path: string): Promise<LocalDoc> {
+// El contenido inicial puede venir de una plantilla (ver data/templates).
+export async function createDocLocal(title: string, path: string, initial?: string): Promise<LocalDoc> {
   const id = "local-" + crypto.randomUUID();
-  const content = `# ${title}\n\n- [ ] Primera tarea #hoy\n\nEmpieza a escribir. Las tareas con \`- [ ]\` aparecerán en el kanban.\n`;
+  const content = initial ?? `# ${title}\n\n- [ ] Primera tarea #hoy\n\nEmpieza a escribir. Las tareas con \`- [ ]\` aparecerán en el kanban.\n`;
   const doc: LocalDoc = {
     id,
     path,

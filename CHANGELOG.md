@@ -4,6 +4,51 @@ Todos los cambios notables de Kora Hub se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### Added
+
+- **Gestión de miembros de workspace**: `GET/PATCH/DELETE /workspaces/:id`,
+  `GET/POST /workspaces/:id/members` (por email, con rol) y
+  `PATCH/DELETE …/members/:uid` con protección del último owner.
+  Panel de gestión en Ajustes (visible solo para owners).
+- **Adjuntos**: `POST/GET/DELETE /attachments` con whitelist MIME verificada
+  por sniffing del contenido, límite `HUB_MAX_UPLOAD_MB`, backend `local`
+  (`data/attachments/`) y `s3` (minio-go, envs `HUB_S3_*`). Drag&drop y
+  pegar en el editor suben el archivo e insertan el enlace Markdown.
+- **Historial de versiones**: cada PATCH guarda el snapshot anterior como
+  archivo en `.versions/<doc>/`; `GET /docs/:id/versions` y `/:vid`
+  exponen la lista y el contenido. Panel "Historial" en el editor con
+  diff visual línea a línea (añadidas/eliminadas).
+- **Backlinks por documento**: `GET /docs/:id/backlinks` + panel en el
+  editor con los docs que enlazan a este (resolución por título/path).
+- **Seguridad (sección 11)**: rate limiting por IP en `/auth/login`,
+  `/auth/register` y `/auth/refresh` (5/min), por usuario en `/sync/push`
+  (60/min); cabeceras `X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy`, `Permissions-Policy`, CSP en la app y HSTS solo tras TLS.
+- **API**: paginación por cursor en `GET /docs` (`?cursor` + `?limit` →
+  `next_cursor`) y filtro `?tipo=doc|tarea|adjunto` en `/search`.
+- **Plantillas de documento**: propuesta, acta de reunión, RFC y
+  retrospectiva al crear un documento (funciona offline).
+- **Export/import de workspace**: `GET /workspaces/:id/export` descarga
+  el árbol canónico en ZIP y `POST /workspaces/:id/import` vuelca un
+  vault (Obsidian u otro) al workspace — merge idempotente por ruta,
+  binarios del ZIP registrados como adjuntos, rutas maliciosas y
+  directorios ocultos (`.obsidian/`, `.trash/`) descartados, reindex
+  automático. Botones Exportar/Importar en Ajustes.
+
+### Fixed
+
+- `backlinks.dst_doc_id` tenía `REFERENCES docs(id)` pero guarda el texto
+  del wikilink: con `foreign_keys(1)` todo insert fallaba y la tabla
+  quedó vacía desde el inicio. Migración `005` recrea la tabla sin el FK.
+- `docs.Store.resolve` permitía `..` (path traversal); ahora confina las
+  rutas al directorio del workspace.
+- `Store.List` indexaba directorios ocultos (`.versions/`): excluidos.
+- El sync LWW solo guardaba el hash de la versión perdedora (snapshot
+  irrecuperable); ahora escribe el contenido en `.versions/`.
+- Test con fecha fija `2026-09-01` caducada → fecha siempre futura.
+
 ## [0.1.2] — 2026-08-16
 
 ### Added
@@ -81,7 +126,7 @@ Primera release pública. MVP completo de la Fase 0 y parte de la Fase 1
 
 ### Changed
 
-- Rediseño completo de la UI (sistema de diseño v2): tema oscuro, un acento,
+- Rediseño completo de la UI (sistema de diseño v2): tema claro, un acento,
   Inter + JetBrains Mono self-hosted
 - Bundle dividido en chunks (main ~22 KB gzip)
 

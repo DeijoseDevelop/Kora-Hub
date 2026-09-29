@@ -13,6 +13,11 @@ type Querier interface {
 	CountUsers(ctx context.Context) (int64, error)
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
+	// Adjuntos (seccion 10): metadatos en el indice, bytes en el backend
+	// de almacenamiento (local o S3-compatible).
+	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) error
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
+	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateDoc(ctx context.Context, arg CreateDocParams) error
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
@@ -21,13 +26,23 @@ type Querier interface {
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
 	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) error
+	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
 	DeleteExpiredRefreshTokens(ctx context.Context) error
+	DeleteMembershipsOfWorkspace(ctx context.Context, workspaceID string) error
 	DeleteTasksForDoc(ctx context.Context, docID string) error
+	DeleteWorkspaceAttachments(ctx context.Context, workspaceID string) error
+	DeleteWorkspaceChanges(ctx context.Context, workspaceID string) error
+	DeleteWorkspaceCommands(ctx context.Context, workspaceID string) error
+	DeleteWorkspaceIndex(ctx context.Context, workspaceID string) error
+	DeleteWorkspaceRows(ctx context.Context, id string) error
+	DeleteWorkspaceTasks(ctx context.Context, workspaceID string) error
+	GetAttachment(ctx context.Context, arg GetAttachmentParams) (Attachment, error)
 	GetChangesAfter(ctx context.Context, arg GetChangesAfterParams) ([]ChangeLog, error)
 	GetDoc(ctx context.Context, arg GetDocParams) (Doc, error)
 	GetDocByID(ctx context.Context, arg GetDocByIDParams) (GetDocByIDRow, error)
 	GetDocByPath(ctx context.Context, arg GetDocByPathParams) (GetDocByPathRow, error)
-	GetDocVersions(ctx context.Context, arg GetDocVersionsParams) ([]GetDocVersionsRow, error)
+	GetDocVersionByID(ctx context.Context, id int64) (DocVersion, error)
+	GetDocVersions(ctx context.Context, arg GetDocVersionsParams) ([]DocVersion, error)
 	GetMembership(ctx context.Context, arg GetMembershipParams) (Membership, error)
 	GetRefreshTokenByID(ctx context.Context, id string) (RefreshToken, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error)
@@ -44,9 +59,12 @@ type Querier interface {
 	InsertDocVersion(ctx context.Context, arg InsertDocVersionParams) error
 	IsCommandProcessed(ctx context.Context, arg IsCommandProcessedParams) (int64, error)
 	LastChangeSeq(ctx context.Context, workspaceID string) (int64, error)
+	ListAttachmentsByWorkspace(ctx context.Context, workspaceID string) ([]Attachment, error)
 	ListBacklinksForGraph(ctx context.Context, workspaceID string) ([]Backlink, error)
+	ListBacklinksTo(ctx context.Context, arg ListBacklinksToParams) ([]ListBacklinksToRow, error)
 	ListDocsByWorkspace(ctx context.Context, workspaceID string) ([]Doc, error)
 	ListDocsForGraph(ctx context.Context, workspaceID string) ([]ListDocsForGraphRow, error)
+	ListMembersByWorkspace(ctx context.Context, workspaceID string) ([]ListMembersByWorkspaceRow, error)
 	ListTasksByDateRange(ctx context.Context, arg ListTasksByDateRangeParams) ([]Task, error)
 	ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]Task, error)
 	// Copyright (C) 2026 Deijose <tech@deijose.dev>
@@ -54,13 +72,20 @@ type Querier interface {
 	ListTasksByWorkspace(ctx context.Context, arg ListTasksByWorkspaceParams) ([]Task, error)
 	ListTasksDueToday(ctx context.Context, arg ListTasksDueTodayParams) ([]Task, error)
 	ListTasksMineToday(ctx context.Context, arg ListTasksMineTodayParams) ([]Task, error)
+	ListTasksPage(ctx context.Context, arg ListTasksPageParams) ([]Task, error)
+	ListUsers(ctx context.Context) ([]ListUsersRow, error)
 	ListWorkspacesByUser(ctx context.Context, userID string) ([]ListWorkspacesByUserRow, error)
 	MarkCommandProcessed(ctx context.Context, arg MarkCommandProcessedParams) error
+	RemoveMembership(ctx context.Context, arg RemoveMembershipParams) error
 	RevokeRefreshToken(ctx context.Context, id string) error
+	SearchAttachmentsByName(ctx context.Context, arg SearchAttachmentsByNameParams) ([]Attachment, error)
+	SearchTasksByTitle(ctx context.Context, arg SearchTasksByTitleParams) ([]Task, error)
 	SetDocUpdatedAt(ctx context.Context, arg SetDocUpdatedAtParams) error
 	SetTaskDone(ctx context.Context, arg SetTaskDoneParams) error
 	SoftDeleteDoc(ctx context.Context, arg SoftDeleteDocParams) error
 	UpdateDocContent(ctx context.Context, arg UpdateDocContentParams) error
+	UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) error
+	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) error
 	UpsertDoc(ctx context.Context, arg UpsertDocParams) (string, error)
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) error
 }

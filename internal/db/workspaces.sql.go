@@ -49,6 +49,69 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 	return err
 }
 
+const deleteMembershipsOfWorkspace = `-- name: DeleteMembershipsOfWorkspace :exec
+DELETE FROM memberships WHERE workspace_id = ?
+`
+
+func (q *Queries) DeleteMembershipsOfWorkspace(ctx context.Context, workspaceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteMembershipsOfWorkspace, workspaceID)
+	return err
+}
+
+const deleteWorkspaceAttachments = `-- name: DeleteWorkspaceAttachments :exec
+DELETE FROM attachments WHERE workspace_id = ?
+`
+
+func (q *Queries) DeleteWorkspaceAttachments(ctx context.Context, workspaceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkspaceAttachments, workspaceID)
+	return err
+}
+
+const deleteWorkspaceChanges = `-- name: DeleteWorkspaceChanges :exec
+DELETE FROM change_log WHERE workspace_id = ?
+`
+
+func (q *Queries) DeleteWorkspaceChanges(ctx context.Context, workspaceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkspaceChanges, workspaceID)
+	return err
+}
+
+const deleteWorkspaceCommands = `-- name: DeleteWorkspaceCommands :exec
+DELETE FROM sync_commands WHERE workspace_id = ?
+`
+
+func (q *Queries) DeleteWorkspaceCommands(ctx context.Context, workspaceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkspaceCommands, workspaceID)
+	return err
+}
+
+const deleteWorkspaceIndex = `-- name: DeleteWorkspaceIndex :exec
+DELETE FROM docs WHERE workspace_id = ?
+`
+
+func (q *Queries) DeleteWorkspaceIndex(ctx context.Context, workspaceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkspaceIndex, workspaceID)
+	return err
+}
+
+const deleteWorkspaceRows = `-- name: DeleteWorkspaceRows :exec
+DELETE FROM workspaces WHERE id = ?
+`
+
+func (q *Queries) DeleteWorkspaceRows(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkspaceRows, id)
+	return err
+}
+
+const deleteWorkspaceTasks = `-- name: DeleteWorkspaceTasks :exec
+DELETE FROM tasks WHERE workspace_id = ?
+`
+
+func (q *Queries) DeleteWorkspaceTasks(ctx context.Context, workspaceID string) error {
+	_, err := q.db.ExecContext(ctx, deleteWorkspaceTasks, workspaceID)
+	return err
+}
+
 const getMembership = `-- name: GetMembership :one
 SELECT user_id, workspace_id, role
 FROM memberships
@@ -65,6 +128,49 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (M
 	var i Membership
 	err := row.Scan(&i.UserID, &i.WorkspaceID, &i.Role)
 	return i, err
+}
+
+const listMembersByWorkspace = `-- name: ListMembersByWorkspace :many
+SELECT u.id AS user_id, u.email, u.display_name, m.role
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+WHERE m.workspace_id = ?
+ORDER BY m.role ASC, u.email ASC
+`
+
+type ListMembersByWorkspaceRow struct {
+	UserID      string `json:"user_id"`
+	Email       string `json:"email"`
+	DisplayName string `json:"display_name"`
+	Role        string `json:"role"`
+}
+
+func (q *Queries) ListMembersByWorkspace(ctx context.Context, workspaceID string) ([]ListMembersByWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMembersByWorkspace, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMembersByWorkspaceRow{}
+	for rows.Next() {
+		var i ListMembersByWorkspaceRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Email,
+			&i.DisplayName,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
@@ -112,4 +218,50 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID string) ([]Li
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeMembership = `-- name: RemoveMembership :exec
+DELETE FROM memberships
+WHERE user_id = ? AND workspace_id = ?
+`
+
+type RemoveMembershipParams struct {
+	UserID      string `json:"user_id"`
+	WorkspaceID string `json:"workspace_id"`
+}
+
+func (q *Queries) RemoveMembership(ctx context.Context, arg RemoveMembershipParams) error {
+	_, err := q.db.ExecContext(ctx, removeMembership, arg.UserID, arg.WorkspaceID)
+	return err
+}
+
+const updateMembershipRole = `-- name: UpdateMembershipRole :exec
+UPDATE memberships SET role = ?
+WHERE user_id = ? AND workspace_id = ?
+`
+
+type UpdateMembershipRoleParams struct {
+	Role        string `json:"role"`
+	UserID      string `json:"user_id"`
+	WorkspaceID string `json:"workspace_id"`
+}
+
+func (q *Queries) UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) error {
+	_, err := q.db.ExecContext(ctx, updateMembershipRole, arg.Role, arg.UserID, arg.WorkspaceID)
+	return err
+}
+
+const updateWorkspaceName = `-- name: UpdateWorkspaceName :exec
+UPDATE workspaces SET name = ?
+WHERE id = ?
+`
+
+type UpdateWorkspaceNameParams struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+func (q *Queries) UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) error {
+	_, err := q.db.ExecContext(ctx, updateWorkspaceName, arg.Name, arg.ID)
+	return err
 }
