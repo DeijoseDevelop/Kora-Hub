@@ -126,6 +126,7 @@ export const en: Record<string, string> = {
   "share.copied": "Link copied",
   "share.copy_failed": "Could not copy",
   "share.revoked": "Link revoked",
+  "share.sync_pending": "The document hasn't synced yet — try again in a few seconds",
 
   // Public view
   "public.loading": "Loading document…",

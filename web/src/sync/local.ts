@@ -14,6 +14,9 @@ export interface LocalDoc {
   updatedAt: string;
   deleted: number;
   workspaceId: string;
+  // id del servidor, adoptado en el primer sync (los docs locales usan
+  // id "local-*" para navegar; los endpoints REST por id necesitan este)
+  serverId?: string;
 }
 
 export interface LocalTask {
@@ -110,18 +113,21 @@ export async function applyChanges(changes: Change[], cursor: number, workspaceI
     if (ch.op === "delete") {
       const id = ch.doc?.id;
       if (id) {
-        const existing = await localDB.docs.get(id);
+        // el delta referencia el id del servidor: el doc local puede
+        // tener id "local-*" — se resuelve por serverId si hace falta.
+        const existing = (await localDB.docs.get(id))
+          ?? (await localDB.docs.filter((d) => d.serverId === id).first());
         if (existing) {
           await localDB.docs.put({ ...existing, deleted: 1 });
-          await localDB.tasks.where("docId").equals(id).delete();
+          await localDB.tasks.where("docId").equals(existing.id).delete();
         }
       }
       continue;
     }
     if (!ch.doc) continue;
     // Un doc creado localmente (id local-*) conserva su id: la UI ya
-    // navega con él. El id del servidor solo se adopta para docs que no
-    // existen localmente (evita duplicados por path sin romper la
+    // navega con él. El id del servidor se adopta en `serverId` para los
+    // endpoints REST por id (evita duplicados por path sin romper la
     // navegación).
     const byPath = await localDB.docs.where("path").equals(ch.doc.path).first();
     if (byPath) {
@@ -132,6 +138,7 @@ export async function applyChanges(changes: Change[], cursor: number, workspaceI
         updatedAt: ch.doc.updated_at,
         deleted: 0,
         workspaceId,
+        serverId: ch.doc.id,
       });
       continue;
     }

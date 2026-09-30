@@ -14,6 +14,26 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
   y se revoca al regenerar o con DELETE. Frontend: botón Compartir en el
   editor (copiar/regenerar/revocar) y vista pública `#/p/:token`
   read-only con render Markdown y cabecera/pie propios.
+- **Load test k6 en CI** (`scripts/loadtest.js` + job `loadtest`):
+  25 VUs de tráfico mezclado sobre el binario real y chequeo del
+  presupuesto P5 leyendo `VmHWM` del proceso — falla si el pico supera
+  100 MB.
+- **E2E Playwright** (`e2e/` + job `e2e` en CI) sobre el binario real:
+  register → doc con tarea → kanban → quick-add offline con replay al
+  reconectar → share-link público sin sesión.
+
+### Fixed
+
+- **Pérdida de datos en la cola offline**: `pushPending` vaciaba la cola
+  Dexie antes de que el push tuviera éxito — un fallo de red (offline,
+  500) perdía las mutaciones encoladas. Ahora solo se borran por id tras
+  un push exitoso (y un comando encolado durante el push sobrevive).
+- **Endpoints por id inalcanzables para docs creados offline**: los docs
+  locales conservan su id `local-*` y nunca aprendían el id del
+  servidor — `/docs/:id/{versions,backlinks,share}` respondían 404
+  siempre para ellos. `applyChanges` ahora sella `serverId` al hacer
+  merge por path; la UI usa `serverId ?? id` y el editor avisa si el doc
+  aún no sincronizó al pedir el enlace.
 
 ## [0.3.0] — 2026-09-29
 

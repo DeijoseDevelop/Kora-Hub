@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 import { applyChanges, getCursor, mirrorDoc, type Change } from "./local";
-import { enqueue, clearQueue } from "./queue";
+import { enqueue, clearQueue, queueDB, type QueuedCommand } from "./queue";
 import { apiFetch, getToken } from "../api/client";
 import { activeWs } from "../data/workspace";
 import { showToast } from "../ui/kit";
@@ -26,24 +26,27 @@ export async function pushPending(): Promise<void> {
     if (!ws || !getToken()) return;
     await pull(ws); // primero converger: menos conflictos LWW
 
-    // comandos pendientes de la cola Dexie
-    const commands = await queueCommands();
-    if (commands.length === 0) return;
+    // Comandos pendientes (solo lectura): se borran por id SOLO tras un
+    // push exitoso — un fallo de red no pierde datos y un comando que se
+    // encole durante el push en vuelo sobrevive al bulkDelete.
+    const pending = await queueCommands();
+    if (pending.length === 0) return;
 
     try {
       const delta = await apiFetch<{ cursor: number; changes: Change[] }>(
         "/sync/push" + (ws ? "?workspace=" + encodeURIComponent(ws) : ""),
         {
           method: "POST",
-          body: JSON.stringify({ commands }),
+          body: JSON.stringify({ commands: pending.map((c) => c.payload) }),
         },
       );
       await applyChanges(delta.changes ?? [], delta.cursor ?? (await getCursor(ws ?? undefined)), ws ?? "");
-      await clearQueue();
+      await queueDB.commands.bulkDelete(pending.map((c) => c.id!));
     } catch (e) {
       // 403 = sin permiso tras refresh válido: se descarta la cola (el
       // servidor decidió) y se avisa. 401/transitorio: la cola se
-      // conserva y se reintenta al reconectar (nunca perder datos).
+      // conserva intacta y se reintenta al reconectar (nunca perder
+      // datos — ver AGENTS: offline-first).
       const msg = (e as Error).message ?? String(e);
       if (msg.includes("HTTP 403")) {
         await clearQueue();
@@ -81,12 +84,8 @@ export async function queueDocUpdate(doc: {
   });
 }
 
-async function queueCommands(): Promise<unknown[]> {
-  // lee y vacía la cola en un solo paso (sin races con el sync)
-  const db = (await import("./queue")).queueDB;
-  const all = await db.commands.orderBy("createdAt").toArray();
-  await db.commands.clear();
-  return all.map((c) => c.payload);
+async function queueCommands(): Promise<QueuedCommand[]> {
+  return queueDB.commands.orderBy("createdAt").toArray();
 }
 
 // sha256 del contenido para el mirror (Web Crypto).

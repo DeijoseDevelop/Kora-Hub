@@ -141,8 +141,9 @@ web/             frontend Nix.js (Vite + Capacitor)
   src/modules    docs, tasks, search, graph, settings, home
   src/app        shell, command palette
 desktop/         app de escritorio Tauri 2 (sidecar del binario)
+e2e/             suite Playwright sobre el binario real (job `e2e` en CI)
+scripts/         tooling de desarrollo y scripts/loadtest.js (k6, job `loadtest`)
 docs/            docs públicas en inglés (ARCHITECTURE.md)
-scripts/         tooling de desarrollo
 screenshots/     capturas reales para README (se regeneran con la app corriendo)
 ```
 

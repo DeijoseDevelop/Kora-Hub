@@ -132,6 +132,7 @@ export const es: Record<string, string> = {
   "share.copied": "Enlace copiado",
   "share.copy_failed": "No se pudo copiar",
   "share.revoked": "Enlace revocado",
+  "share.sync_pending": "El documento aún no se ha sincronizado — espera unos segundos",
 
   // Vista pública
   "public.loading": "Cargando documento…",

@@ -15,7 +15,7 @@ import { t } from "../../i18n";
 export class DocEditorPage extends NixComponent {
   private editor = new MarkdownEditor("", (text) => this.updatePreview(text), (f) => this.uploadAttachment(f));
   private status = signal("");
-  private current: { id: string; path: string; title: string } | null = null;
+  private current: { id: string; path: string; title: string; serverId?: string } | null = null;
   private previewRef = ref<HTMLDivElement>();
   private versions = signal<DocVersion[] | null>(null);
   private diffOf = signal<{ vid: number; created: string } | null>(null);
@@ -39,7 +39,7 @@ export class DocEditorPage extends NixComponent {
       this.status.value = t("editor.not_found");
       return;
     }
-    this.current = { id: doc.id, path: doc.path, title: doc.title };
+    this.current = { id: doc.id, path: doc.path, title: doc.title, serverId: doc.serverId };
     this.editor.setDoc(doc.content);
     this.updatePreview(doc.content);
   }
@@ -139,9 +139,9 @@ export class DocEditorPage extends NixComponent {
     }
     if (!this.current) return;
     try {
-      const res = await docsApi.versions(this.current.id);
+      const res = await docsApi.versions(this.serverDocId());
       this.versions.value = res.versions;
-      const bl = await docsApi.backlinks(this.current.id);
+      const bl = await docsApi.backlinks(this.serverDocId());
       this.backlinks.value = bl.backlinks;
     } catch (e) {
       showToast((e as Error).message);
@@ -153,7 +153,7 @@ export class DocEditorPage extends NixComponent {
   private async showDiff(v: DocVersion): Promise<void> {
     if (!this.current) return;
     try {
-      const res = await docsApi.version(this.current.id, v.id);
+      const res = await docsApi.version(this.serverDocId(), v.id);
       const diff = lineDiff(res.content, this.editor.getDoc());
       this.diffOf.value = { vid: v.id, created: v.created_at };
       // el ref se monta tras el render del signal; deferir el innerHTML
@@ -173,6 +173,13 @@ export class DocEditorPage extends NixComponent {
     }
   }
 
+  // serverDocId resuelve el id del servidor: los docs creados offline
+  // llevan id "local-*" hasta el primer sync — los endpoints REST por id
+  // solo entienden el id del servidor (ver sync/local.ts applyChanges).
+  private serverDocId(): string {
+    return this.current?.serverId ?? this.current?.id ?? "";
+  }
+
   // Share-link público (D5): crear/regenerar/revocar son editor+ — el
   // backend es la autoridad; la UI solo refleja el resultado.
   private async toggleShare(): Promise<void> {
@@ -181,8 +188,16 @@ export class DocEditorPage extends NixComponent {
       return;
     }
     if (!this.current) return;
+    // Relee el mirror: serverId aparece tras el primer sync; sin él el
+    // backend aún no conoce el doc y compartir es imposible.
+    const fresh = await getLocalDocById(this.current.id);
+    if (fresh?.serverId) this.current.serverId = fresh.serverId;
+    if (!this.current.serverId) {
+      showToast(t("share.sync_pending"));
+      return;
+    }
     try {
-      this.share.value = await sharesApi.get(this.current.id);
+      this.share.value = await sharesApi.get(this.serverDocId());
     } catch (e) {
       showToast((e as Error).message);
     }
@@ -191,7 +206,7 @@ export class DocEditorPage extends NixComponent {
   private async createShare(): Promise<void> {
     if (!this.current) return;
     try {
-      const res = await sharesApi.create(this.current.id);
+      const res = await sharesApi.create(this.serverDocId());
       this.share.value = { token: res.token, url: res.url };
     } catch (e) {
       showToast((e as Error).message);
@@ -201,7 +216,7 @@ export class DocEditorPage extends NixComponent {
   private async revokeShare(): Promise<void> {
     if (!this.current) return;
     try {
-      await sharesApi.remove(this.current.id);
+      await sharesApi.remove(this.serverDocId());
       this.share.value = { token: null };
       showToast(t("share.revoked"));
     } catch (e) {

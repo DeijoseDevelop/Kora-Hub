@@ -1,0 +1,12 @@
+{
+  "name": "kora-hub-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "E2E Playwright sobre el binario real de Kora Hub",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0"
+  }
+}
