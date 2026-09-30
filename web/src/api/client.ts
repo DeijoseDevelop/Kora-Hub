@@ -195,6 +195,41 @@ export const docsApi = {
   backlinks: (id: string) => api<{ backlinks: Backlink[] }>(`/docs/${id}/backlinks`),
 };
 
+export interface ShareState {
+  token: string | null;
+  url?: string;
+  created_at?: string;
+}
+
+// Share-links públicos (D5): el token es la capacidad; regenerar rota el
+// token e invalida el anterior.
+export const sharesApi = {
+  get: (docId: string) => api<ShareState>(`/docs/${docId}/share`),
+  create: (docId: string) =>
+    api<{ token: string; url: string }>(`/docs/${docId}/share`, { method: "POST" }),
+  remove: (docId: string) =>
+    api<void>(`/docs/${docId}/share`, { method: "DELETE" }),
+};
+
+export interface PublicDoc {
+  title: string;
+  path: string;
+  content: string;
+  updated_at: string;
+}
+
+// publicDocsApi NO usa api() — el visitante del enlace no tiene sesión.
+export const publicDocsApi = {
+  get: async (token: string): Promise<PublicDoc> => {
+    const res = await fetch(`/api/v1/public/docs/${token}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+};
+
 export const attachmentsApi = {
   list: (workspace: string) =>
     api<{ attachments: Attachment[] }>(`/attachments?workspace=${workspace}`),

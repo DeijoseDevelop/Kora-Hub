@@ -5,7 +5,7 @@ import { getLocalDocById, saveDocLocal } from "../../data/mutations";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { parseLine } from "../../tasks/parser";
 import { escapeHtml, formatDate, isOverdue, showToast } from "../../ui/kit";
-import { attachmentsApi, docsApi, type Backlink, type DocVersion } from "../../api/client";
+import { attachmentsApi, docsApi, sharesApi, type Backlink, type DocVersion, type ShareState } from "../../api/client";
 import { activeWs } from "../../data/workspace";
 import { lineDiff } from "./diff";
 import { t } from "../../i18n";
@@ -21,6 +21,8 @@ export class DocEditorPage extends NixComponent {
   private diffOf = signal<{ vid: number; created: string } | null>(null);
   private diffRef = ref<HTMLElement>();
   private backlinks = signal<Backlink[] | null>(null);
+  // undefined = panel cerrado; null-token = doc sin share activo.
+  private share = signal<ShareState | undefined>(undefined);
 
   onMount(): void {
     const id = router.params.value.id ?? "";
@@ -52,6 +54,7 @@ export class DocEditorPage extends NixComponent {
           </div>
           <div class="doc-actions">
             <button class="btn ghost" id="toggle-versions" @click=${() => void this.toggleVersions()}>${() => t("editor.history")}</button>
+            <button class="btn ghost" id="toggle-share" @click=${() => void this.toggleShare()}>${() => t("editor.share")}</button>
             <button class="btn" @click=${() => this.save()}>${() => t("editor.save")}</button>
           </div>
         </div>
@@ -59,6 +62,23 @@ export class DocEditorPage extends NixComponent {
           ${this.editor}
           <div class="doc-preview" ref=${this.previewRef}></div>
         </div>
+        ${() => this.share.value !== undefined ? html`
+          <div class="share-panel">
+            <p class="muted">${() => t("share.note")}</p>
+            ${this.share.value?.token ? html`
+              <div class="share-url-row">
+                <input class="share-url" readonly value=${() => this.shareUrl()} />
+                <button class="btn sm" @click=${() => void this.copyShare()}>${() => t("share.copy")}</button>
+                <button class="btn ghost sm" @click=${() => void this.createShare()}>${() => t("share.regenerate")}</button>
+                <button class="btn ghost sm" @click=${() => void this.revokeShare()}>${() => t("share.revoke")}</button>
+              </div>
+            ` : html`
+              <div class="share-url-row">
+                <span class="muted">${() => t("share.none")}</span>
+                <button class="btn sm" @click=${() => void this.createShare()}>${() => t("share.create")}</button>
+              </div>`}
+          </div>
+        ` : ""}
         ${() => this.diffOf.value ? html`
           <div class="diff-panel">
             <div class="diff-header">
@@ -150,6 +170,56 @@ export class DocEditorPage extends NixComponent {
       });
     } catch (e) {
       showToast((e as Error).message);
+    }
+  }
+
+  // Share-link público (D5): crear/regenerar/revocar son editor+ — el
+  // backend es la autoridad; la UI solo refleja el resultado.
+  private async toggleShare(): Promise<void> {
+    if (this.share.value !== undefined) {
+      this.share.value = undefined;
+      return;
+    }
+    if (!this.current) return;
+    try {
+      this.share.value = await sharesApi.get(this.current.id);
+    } catch (e) {
+      showToast((e as Error).message);
+    }
+  }
+
+  private async createShare(): Promise<void> {
+    if (!this.current) return;
+    try {
+      const res = await sharesApi.create(this.current.id);
+      this.share.value = { token: res.token, url: res.url };
+    } catch (e) {
+      showToast((e as Error).message);
+    }
+  }
+
+  private async revokeShare(): Promise<void> {
+    if (!this.current) return;
+    try {
+      await sharesApi.remove(this.current.id);
+      this.share.value = { token: null };
+      showToast(t("share.revoked"));
+    } catch (e) {
+      showToast((e as Error).message);
+    }
+  }
+
+  private shareUrl(): string {
+    const token = this.share.value?.token;
+    return token ? `${location.origin}${location.pathname}#/p/${token}` : "";
+  }
+
+  private async copyShare(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.shareUrl());
+      showToast(t("share.copied"));
+    } catch {
+      showToast(t("share.copy_failed"));
     }
   }
 

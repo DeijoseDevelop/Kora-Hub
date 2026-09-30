@@ -6,6 +6,7 @@ import { TasksPage } from "./modules/tasks/TasksPage";
 import { SearchPage } from "./modules/search/SearchPage";
 import { GraphPage } from "./modules/graph/GraphPage";
 import { SettingsPage } from "./modules/settings/SettingsPage";
+import { PublicDocPage } from "./modules/docs/PublicDocPage";
 
 // Rutas con carga directa: el bundle es pequeño (<20 KB) y la navegación
 // es instantánea sin estados de carga intermedios.
@@ -17,6 +18,8 @@ const routes: RouteRecord[] = [
   { path: "/search", component: () => SearchPage(), meta: { auth: true } },
   { path: "/graph", component: () => new GraphPage(), meta: { auth: true } },
   { path: "/settings", component: () => new SettingsPage(), meta: { auth: true } },
+  // Ruta publica de share-links (D5): sin sesión, solo lectura.
+  { path: "/p/:token", component: () => new PublicDocPage(), meta: { auth: false } },
 ];
 
 export const router = createRouter(routes, { mode: "hash" });

@@ -77,6 +77,9 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 		api.POST("/auth/refresh", rateLimit(30, time.Minute, clientIP), s.handleRefresh)
 		api.GET("/auth/status", s.handleAuthStatus)
 
+		// share-links publicos (D5): el token es la capacidad, sin sesion
+		api.GET("/public/docs/:token", s.handlePublicDoc)
+
 		authed := api.Group("", s.authMiddleware())
 		{
 			authed.POST("/auth/logout", s.handleLogout)
@@ -106,6 +109,9 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 			authed.GET("/docs/:id/versions", s.handleListDocVersions)
 			authed.GET("/docs/:id/versions/:vid", s.handleGetDocVersion)
 			authed.GET("/docs/:id/backlinks", s.handleListDocBacklinks)
+			authed.GET("/docs/:id/share", s.handleGetShare)
+			authed.POST("/docs/:id/share", s.handleCreateShare)
+			authed.DELETE("/docs/:id/share", s.handleDeleteShare)
 
 			authed.GET("/tasks", s.handleListTasks)
 			authed.POST("/tasks", s.handleQuickAdd)

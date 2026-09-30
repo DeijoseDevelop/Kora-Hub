@@ -31,6 +31,7 @@ type Querier interface {
 	// SPDX-License-Identifier: AGPL-3.0-only
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) error
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error
+	DeleteDocShare(ctx context.Context, docID string) error
 	DeleteExpiredRefreshTokens(ctx context.Context) error
 	DeleteMembershipsOfWorkspace(ctx context.Context, workspaceID string) error
 	DeleteSavedView(ctx context.Context, arg DeleteSavedViewParams) error
@@ -46,9 +47,14 @@ type Querier interface {
 	GetDoc(ctx context.Context, arg GetDocParams) (Doc, error)
 	GetDocByID(ctx context.Context, arg GetDocByIDParams) (GetDocByIDRow, error)
 	GetDocByPath(ctx context.Context, arg GetDocByPathParams) (GetDocByPathRow, error)
+	GetDocShare(ctx context.Context, docID string) (DocShare, error)
+	GetDocShareByToken(ctx context.Context, token string) (DocShare, error)
 	GetDocVersionByID(ctx context.Context, id int64) (DocVersion, error)
 	GetDocVersions(ctx context.Context, arg GetDocVersionsParams) ([]DocVersion, error)
 	GetMembership(ctx context.Context, arg GetMembershipParams) (Membership, error)
+	// Lookup publico: el token ES la capacidad (no hay workspace explicito).
+	// Devuelve slug para leer el archivo canonico del store.
+	GetPublicDocByToken(ctx context.Context, token string) (GetPublicDocByTokenRow, error)
 	GetRefreshTokenByID(ctx context.Context, id string) (RefreshToken, error)
 	GetSavedView(ctx context.Context, arg GetSavedViewParams) (SavedView, error)
 	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error)
@@ -95,6 +101,10 @@ type Querier interface {
 	UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) error
 	UpdateWorkspaceName(ctx context.Context, arg UpdateWorkspaceNameParams) error
 	UpsertDoc(ctx context.Context, arg UpsertDocParams) (string, error)
+	// Copyright (C) 2026 Deijose <tech@deijose.dev>
+	// SPDX-License-Identifier: AGPL-3.0-only
+	// shares.sql - share-links publicos de documentos (ASCII puro: sqlc)
+	UpsertDocShare(ctx context.Context, arg UpsertDocShareParams) error
 	UpsertTask(ctx context.Context, arg UpsertTaskParams) error
 }
 

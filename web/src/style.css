@@ -1874,12 +1874,59 @@ kbd {
 
 .versions-panel,
 .backlinks-panel,
-.diff-panel {
+.diff-panel,
+.share-panel {
   margin-top: 14px;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   background: var(--bg-soft);
   padding: 12px 14px;
+}
+
+.share-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.share-url {
+  flex: 1;
+  min-width: 220px;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Vista pública de share-links (D5) */
+.public-page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.public-header {
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+}
+
+.public-footer {
+  margin-top: 28px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 12px;
+  font-size: 12px;
+  color: var(--text-faint, #888);
+  text-align: center;
+}
+
+.public-error {
+  text-align: center;
+  padding: 64px 0;
 }
 
 .versions-panel h4,

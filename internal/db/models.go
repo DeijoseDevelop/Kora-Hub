@@ -57,6 +57,13 @@ type Doc struct {
 	DeletedAt   sql.NullString `json:"deleted_at"`
 }
 
+type DocShare struct {
+	DocID     string `json:"doc_id"`
+	Token     string `json:"token"`
+	CreatedBy string `json:"created_by"`
+	CreatedAt string `json:"created_at"`
+}
+
 type DocVersion struct {
 	ID          int64  `json:"id"`
 	DocID       string `json:"doc_id"`

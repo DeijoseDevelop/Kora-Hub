@@ -120,6 +120,23 @@ export const es: Record<string, string> = {
   "editor.no_ws": "Sin workspace activo",
   "editor.not_found": "no encontrado",
   "editor.no_id": "error: sin id de documento",
+  "editor.share": "Compartir",
+
+  // Share-links públicos
+  "share.note": "Cualquiera con el enlace puede leer este documento (solo lectura).",
+  "share.none": "Este documento no tiene enlace público.",
+  "share.create": "Crear enlace",
+  "share.copy": "Copiar",
+  "share.regenerate": "Regenerar",
+  "share.revoke": "Revocar",
+  "share.copied": "Enlace copiado",
+  "share.copy_failed": "No se pudo copiar",
+  "share.revoked": "Enlace revocado",
+
+  // Vista pública
+  "public.loading": "Cargando documento…",
+  "public.invalid": "Este enlace no es válido o fue revocado.",
+  "public.powered": "Publicado con Kora Hub",
 
   // Búsqueda / grafo / paleta
   "search.title": "Búsqueda",

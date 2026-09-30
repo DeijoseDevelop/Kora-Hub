@@ -6,6 +6,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ## [Unreleased]
 
+### Added
+
+- **Share-links públicos de documentos** (decisión D5): `GET/POST/DELETE
+  /docs/:id/share` (editor+) y `GET /public/docs/:token` sin sesión — el
+  token ULID es la capacidad, sirve el Markdown canónico del filesystem
+  y se revoca al regenerar o con DELETE. Frontend: botón Compartir en el
+  editor (copiar/regenerar/revocar) y vista pública `#/p/:token`
+  read-only con render Markdown y cabecera/pie propios.
+
 ## [0.3.0] — 2026-09-29
 
 ### Added

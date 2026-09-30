@@ -114,6 +114,23 @@ export const en: Record<string, string> = {
   "editor.no_ws": "No active workspace",
   "editor.not_found": "not found",
   "editor.no_id": "error: no document id",
+  "editor.share": "Share",
+
+  // Public share links
+  "share.note": "Anyone with this link can read this document (read-only).",
+  "share.none": "This document has no public link.",
+  "share.create": "Create link",
+  "share.copy": "Copy",
+  "share.regenerate": "Regenerate",
+  "share.revoke": "Revoke",
+  "share.copied": "Link copied",
+  "share.copy_failed": "Could not copy",
+  "share.revoked": "Link revoked",
+
+  // Public view
+  "public.loading": "Loading document…",
+  "public.invalid": "This link is invalid or was revoked.",
+  "public.powered": "Published with Kora Hub",
 
   "search.title": "Search",
   "search.desc": "Instant client-side search with FlexSearch over the local copy; deep search (FTS5) delegated to the server when online.",
