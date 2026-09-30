@@ -24,6 +24,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ### Fixed
 
+- **Imagen GHCR multi-arch**: `latest`/`<version>` resolvían solo amd64;
+  ahora `docker_manifests` une `amd64`+`arm64` — el one-liner de Docker
+  funciona igual en hosts ARM. Verificado: `docker pull
+  ghcr.io/deijosedevelop/kora-hub:0.3.0` + `docker run` → `/healthz`
+  responde `version: 0.3.0`.
 - **Pérdida de datos en la cola offline**: `pushPending` vaciaba la cola
   Dexie antes de que el push tuviera éxito — un fallo de red (offline,
   500) perdía las mutaciones encoladas. Ahora solo se borran por id tras
