@@ -60,6 +60,64 @@ jobs:
       - name: Go tests
         run: go test ./...
 
+  # Load test k6 sobre el binario real + verificación del presupuesto P5
+  # (<100 MB RAM): tras el pico se lee VmHWM (pico RSS) del proceso.
+  loadtest:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Frontend deps + build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build binary
+        run: |
+          rm -rf internal/web/dist && cp -r web/dist internal/web/dist
+          go build -o bin/kora-hub ./cmd/hub
+
+      - name: Start server
+        run: |
+          mkdir -p /tmp/kora-data
+          HUB_BIND=127.0.0.1:8099 HUB_DATA_DIR=/tmp/kora-data \
+            HUB_JWT_SECRET=ci-loadtest-secret bin/kora-hub &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/healthz && exit 0
+            sleep 1
+          done
+          echo "el servidor no arranco" && exit 1
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: k6 run
+        run: k6 run scripts/loadtest.js
+        env:
+          BASE_URL: http://127.0.0.1:8099
+
+      - name: Memory budget check (<100 MB)
+        run: |
+          PID=$(pgrep -x kora-hub | head -1)
+          HWM_KB=$(awk '/VmHWM/ {print $2}' /proc/"$PID"/status)
+          echo "pico RSS: ${HWM_KB} KB"
+          if [ "$HWM_KB" -gt 102400 ]; then
+            echo "::error::presupuesto de RAM superado: ${HWM_KB} KB > 102400 KB"
+            exit 1
+          fi
+          kill "$PID" || true
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
