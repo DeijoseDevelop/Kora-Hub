@@ -29,7 +29,9 @@ const tmp = join(binDir, `kora-hub-tmp${ext}`);
 const final = join(binDir, `kora-hub-${triple}${ext}`);
 
 console.log(`[sidecar] go build (${triple}) v${version}`);
-execSync(`go build -ldflags "-s -w -X github.com/DeijoseDevelop/Kora-Hub/internal/server.Version=${version}" -o ${tmp} ./cmd/hub`, {
+// Las rutas van comilladas: el repo puede vivir en una carpeta con
+// espacios (p.ej. "Open Source") y execSync corta el comando por ' '.
+execSync(`go build -ldflags "-s -w -X github.com/DeijoseDevelop/Kora-Hub/internal/server.Version=${version}" -o "${tmp}" ./cmd/hub`, {
   cwd: root,
   stdio: "inherit",
 });
