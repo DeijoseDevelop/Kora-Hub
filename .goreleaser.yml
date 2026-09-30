@@ -50,8 +50,8 @@ dockers:
     goarch: amd64
     dockerfile: Dockerfile.goreleaser
     image_templates:
-      - "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}"
-      - "ghcr.io/deijosedevelop/kora-hub:latest"
+      - "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}-amd64"
+      - "ghcr.io/deijosedevelop/kora-hub:latest-amd64"
     build_flag_templates:
       - "--platform=linux/amd64"
   - id: hub-docker-arm64
@@ -64,6 +64,18 @@ dockers:
       - "ghcr.io/deijosedevelop/kora-hub:latest-arm64"
     build_flag_templates:
       - "--platform=linux/arm64"
+
+# Manifests multi-arch: :latest y :<version> resuelven la arquitectura
+# correcta en cualquier host (sin esto :latest era solo amd64).
+docker_manifests:
+  - name_template: "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}-amd64"
+      - "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/deijosedevelop/kora-hub:latest"
+    image_templates:
+      - "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}-amd64"
+      - "ghcr.io/deijosedevelop/kora-hub:{{ .Version }}-arm64"
 
 changelog:
   sort: asc
