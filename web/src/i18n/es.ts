@@ -111,6 +111,8 @@ export const es: Record<string, string> = {
   "auth.registered": "Cuenta creada — bienvenido",
   "auth.logged_in": "Sesión iniciada",
   "auth.hint": 'Datos 100% locales y offline-first. Al crear tu cuenta se configura tu workspace "Personal" automáticamente.',
+  "auth.server_ph": "URL del servidor (ej: http://192.168.1.10:8080)",
+  "auth.server_hint": "En la app nativa, indica la URL de tu servidor Kora Hub",
 
   // Ajustes
   "settings.title": "Ajustes",

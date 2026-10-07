@@ -1,8 +1,13 @@
 import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
-import { authApi, getToken, setSession } from "../../api/client";
+import { authApi, getToken, setSession, getApiBase, setApiBase } from "../../api/client";
 import { router } from "../../router";
 import { showToast } from "../../ui/kit";
 import { t } from "../../i18n";
+
+function isNative(): boolean {
+  return typeof (window as any).Capacitor !== "undefined" &&
+    (window as any).Capacitor?.isNativePlatform?.() === true;
+}
 
 // Pantalla Auth: tabs "Entrar" / "Crear cuenta". En el primer arranque
 // (sin usuarios registrados) "Crear cuenta" es la opción por defecto.
@@ -12,6 +17,7 @@ export class HomePage extends ElurComponent {
   private password = signal("");
   private displayName = signal("");
   private showPassword = signal(false);
+  private serverUrl = signal(getApiBase());
 
   onMount(): void {
     // con sesión activa, / redirige a Documentos (la pantalla auth
@@ -26,6 +32,9 @@ export class HomePage extends ElurComponent {
   }
 
   private submit(): void {
+    if (isNative()) {
+      setApiBase(this.serverUrl.value.trim());
+    }
     if (this.password.value.length < 8) {
       showToast(t("auth.pw_short"));
       return;
@@ -59,6 +68,13 @@ export class HomePage extends ElurComponent {
         ev.preventDefault();
         this.submit();
       }}>
+            ${() => isNative() ? html`
+              <div class="field">
+                <input type="url" placeholder=${() => t("auth.server_ph")}
+                  value=${() => this.serverUrl.value}
+                  @input=${(ev: Event) => (this.serverUrl.value = (ev.target as HTMLInputElement).value)} />
+                <p class="login-hint" style="margin:4px 0 0;font-size:11px">${() => t("auth.server_hint")}</p>
+              </div>` : ""}
             ${() =>
         this.mode.value === "register"
           ? html`

@@ -38,6 +38,36 @@ const TOKEN_KEY = "hub:token";
 const REFRESH_KEY = "hub:refresh";
 const EXPIRES_KEY = "hub:expires";
 
+// API base URL: en web/PWA las URLs relativas van al mismo origen. En
+// Capacitor (Android/iOS) la app corre desde capacitor://localhost —
+// hay que apuntar al servidor real. Se guarda en localStorage.
+const API_BASE_KEY = "hub:api-base";
+
+function isNative(): boolean {
+  return typeof (window as any).Capacitor !== "undefined" &&
+    (window as any).Capacitor?.isNativePlatform?.() === true;
+}
+
+export function getApiBase(): string {
+  const stored = localStorage.getItem(API_BASE_KEY) ?? "";
+  if (stored) return stored.replace(/\/+$/, "");
+  // default: el mismo origen (web/PWA). Para Capacitor el usuario debe
+  // configurarlo en Ajustes (p. ej. http://192.168.1.10:8080)
+  return isNative() ? "" : "";
+}
+
+export function setApiBase(url: string): void {
+  if (url) {
+    localStorage.setItem(API_BASE_KEY, url.replace(/\/+$/, ""));
+  } else {
+    localStorage.removeItem(API_BASE_KEY);
+  }
+}
+
+function apiUrl(path: string): string {
+  return getApiBase() + path;
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -80,7 +110,7 @@ export function refreshSession(): Promise<boolean> {
       const refresh = getRefreshToken();
       if (!refresh) return false;
       try {
-        const res = await fetch("/api/v1/auth/refresh", {
+        const res = await fetch(apiUrl("/api/v1/auth/refresh"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refresh_token: refresh }),
@@ -109,12 +139,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  let res = await fetch(`/api/v1${path}`, { ...init, headers });
+  let res = await fetch(apiUrl(`/api/v1${path}`), { ...init, headers });
   if (res.status === 401) {
     const refreshed = await refreshSession();
     if (refreshed) {
       headers.Authorization = `Bearer ${getToken()}`;
-      res = await fetch(`/api/v1${path}`, { ...init, headers });
+      res = await fetch(apiUrl(`/api/v1${path}`), { ...init, headers });
     }
   }
   if (res.status === 401) {
@@ -221,7 +251,7 @@ export interface PublicDoc {
 // publicDocsApi NO usa api() — el visitante del enlace no tiene sesión.
 export const publicDocsApi = {
   get: async (token: string): Promise<PublicDoc> => {
-    const res = await fetch(`/api/v1/public/docs/${token}`);
+    const res = await fetch(apiUrl(`/api/v1/public/docs/${token}`));
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
@@ -237,7 +267,7 @@ export const attachmentsApi = {
     const form = new FormData();
     form.append("file", file);
     if (docId) form.append("doc_id", docId);
-    const res = await fetch(`/api/v1/attachments?workspace=${workspace}`, {
+    const res = await fetch(apiUrl(`/api/v1/attachments?workspace=${workspace}`), {
       method: "POST",
       headers: { Authorization: `Bearer ${getToken()}` },
       body: form,
@@ -330,7 +360,7 @@ export const workspacesApi = {
     api<void>(`/workspaces/${id}/members/${uid}`, { method: "DELETE" }),
   // export descarga el árbol canónico del workspace como ZIP (P1).
   exportZip: async (id: string, slug: string): Promise<void> => {
-    const res = await fetch(`/api/v1/workspaces/${id}/export`, {
+    const res = await fetch(apiUrl(`/api/v1/workspaces/${id}/export`), {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -345,7 +375,7 @@ export const workspacesApi = {
   importZip: async (id: string, file: File): Promise<{ imported: number; attachments: number; skipped: number; indexed: number }> => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`/api/v1/workspaces/${id}/import`, {
+    const res = await fetch(apiUrl(`/api/v1/workspaces/${id}/import`), {
       method: "POST",
       headers: { Authorization: `Bearer ${getToken()}` },
       body: form,
