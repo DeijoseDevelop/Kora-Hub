@@ -22,7 +22,7 @@ test.beforeAll(async ({ request: req }) => {
   api = await request.newContext({ baseURL });
   // rate limit: 5/min por IP en /auth/register. Reintenta con backoff
   // si el servidor devuelve 429 (corridas seguidas en local).
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     const res = await api.post("/api/v1/auth/register", {
       data: {
         email: `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@kora.test`,
@@ -34,8 +34,8 @@ test.beforeAll(async ({ request: req }) => {
       session = await res.json();
       return;
     }
-    if (res.status() === 429 && attempt < 4) {
-      await new Promise((r) => setTimeout(r, 15_000));
+    if (res.status() === 429 && attempt < 3) {
+      await new Promise((r) => setTimeout(r, 12_000));
       continue;
     }
     throw new Error(`register fallo: ${res.status()} ${await res.text()}`);

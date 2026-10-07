@@ -8,7 +8,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   workers: 1,
-  timeout: 30_000,
+  timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: process.env.BASE_URL ?? "http://127.0.0.1:8099",
