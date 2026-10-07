@@ -26,6 +26,9 @@ export class App extends ElurComponent {
   private theme = signal<"light" | "dark" | "system">(
     (localStorage.getItem("hub:theme") as "light" | "dark" | "system") ?? "system",
   );
+  private qsOpen = signal(false);
+  private qsQuery = signal("");
+  private qsSelected = signal(0);
 
   onMount(): (() => void) | void {
     this.applyTheme();
@@ -46,6 +49,19 @@ export class App extends ElurComponent {
         ev.preventDefault();
         this.palette.toggle();
         return;
+      }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "p") {
+        ev.preventDefault();
+        this.toggleQuickSwitcher();
+        return;
+      }
+      if (this.qsOpen.value) {
+        if (ev.key === "Escape") { ev.preventDefault(); this.qsOpen.value = false; return; }
+        if (ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "Enter") {
+          ev.preventDefault();
+          this.qsKeydown(ev);
+          return;
+        }
       }
       if (ev.key === "Escape") {
         this.palette.close();
@@ -120,6 +136,41 @@ export class App extends ElurComponent {
       document.documentElement.setAttribute("data-theme", t);
     }
     localStorage.setItem("hub:theme", t);
+  }
+
+  private toggleQuickSwitcher(): void {
+    this.qsOpen.value = !this.qsOpen.value;
+    if (this.qsOpen.value) {
+      this.qsQuery.value = "";
+      this.qsSelected.value = 0;
+      queueMicrotask(() => {
+        try {
+          document.querySelector<HTMLInputElement>(".qs-input")?.focus();
+        } catch { /* noop */ }
+      });
+    }
+  }
+
+  private qsKeydown(ev: KeyboardEvent): void {
+    const docs = this.qsFiltered();
+    if (ev.key === "ArrowDown") {
+      this.qsSelected.value = Math.min(docs.length - 1, this.qsSelected.value + 1);
+    } else if (ev.key === "ArrowUp") {
+      this.qsSelected.value = Math.max(0, this.qsSelected.value - 1);
+    } else if (ev.key === "Enter") {
+      const d = docs[this.qsSelected.value];
+      if (d) {
+        router.navigate("/docs/" + d.id);
+        this.qsOpen.value = false;
+      }
+    }
+  }
+
+  private qsFiltered() {
+    const q = this.qsQuery.value.toLowerCase();
+    return localDocs.value
+      .filter((d) => d.workspaceId === activeWs.value && (!q || d.title.toLowerCase().includes(q) || d.path.toLowerCase().includes(q)))
+      .slice(0, 15);
   }
 
   private cycleTheme(): void {
@@ -271,6 +322,32 @@ export class App extends ElurComponent {
           <main class="content">${new RouterView()}</main>
         </main>
         ${this.palette}
+        ${() => this.qsOpen.value ? html`
+          <div class="qs-overlay" @click=${(ev: MouseEvent) => {
+            if ((ev.target as HTMLElement).classList.contains("qs-overlay")) this.qsOpen.value = false;
+          }}>
+            <div class="qs-panel">
+              <input class="qs-input" placeholder=${() => t("app.qs_ph")}
+                value=${() => this.qsQuery.value}
+                @input=${(ev: Event) => {
+                  this.qsQuery.value = (ev.target as HTMLInputElement).value;
+                  this.qsSelected.value = 0;
+                }}
+                @keydown=${(ev: KeyboardEvent) => this.qsKeydown(ev)} />
+              <div class="qs-list">
+                ${() => this.qsFiltered().map((d, i) => html`
+                  <div class=${"qs-item" + (i === this.qsSelected.value ? " selected" : "")}
+                    @click=${() => { router.navigate("/docs/" + d.id); this.qsOpen.value = false; }}
+                    @mouseenter=${() => (this.qsSelected.value = i)}>
+                    <span class="qs-icon">${d.title.match(/[\p{Emoji}]/u)?.[0] ?? "📄"}</span>
+                    <span class="qs-title">${d.title}</span>
+                    <span class="qs-path">${d.path}</span>
+                  </div>`)}
+                ${() => this.qsFiltered().length === 0 ? html`<div class="palette-empty">${() => t("palette.empty")}</div>` : ""}
+              </div>
+            </div>
+          </div>
+        ` : ""}
       </div>
     `;
   }

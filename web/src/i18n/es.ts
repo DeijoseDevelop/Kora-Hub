@@ -20,6 +20,7 @@ export const es: Record<string, string> = {
   "app.pending": "pendientes",
   "app.search": "Buscar",
   "app.theme": "Cambiar tema",
+  "app.qs_ph": "Ir a documento…",
 
   // Auth
   "auth.tagline": "El workspace donde la documentación y la ejecución son la misma cosa.",

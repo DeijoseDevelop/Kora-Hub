@@ -19,6 +19,7 @@ export const en: Record<string, string> = {
   "app.pending": "pending",
   "app.search": "Search",
   "app.theme": "Toggle theme",
+  "app.qs_ph": "Go to document…",
 
   "auth.tagline": "The workspace where documentation and execution are the same thing.",
   "auth.login": "Sign in",

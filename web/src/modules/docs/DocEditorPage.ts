@@ -309,6 +309,35 @@ export class DocEditorPage extends ElurComponent {
     }
     preview.innerHTML = html;
     this.enhanceTaskLines(preview);
+    this.enhanceCallouts(preview);
+  }
+
+  // enhanceCallouts convierte blockquotes '> [!type] Título' en callouts
+  // estilizados (Obsidian-style: note, tip, warning, danger, info).
+  private enhanceCallouts(preview: HTMLElement): void {
+    const quotes = Array.from(preview.querySelectorAll("blockquote"));
+    for (const bq of quotes) {
+      const text = bq.textContent ?? "";
+      const m = /^\[!(\w+)\]\s*(.*)/.exec(text.trim());
+      if (!m) continue;
+      const type = m[1].toLowerCase();
+      const title = m[2].trim() || type.charAt(0).toUpperCase() + type.slice(1);
+      const icons: Record<string, string> = {
+        note: "📝", tip: "💡", warning: "⚠️", danger: "🚨", info: "ℹ️",
+        example: "📋", quote: "💬", question: "❓", success: "✅", bug: "🐛",
+      };
+      const icon = icons[type] ?? "📝";
+      const body = bq.innerHTML.replace(/^[^<]*<\/?p>/g, "").replace(/^\[!\w+\]\s*<p>/, "<p>").trim();
+      const callout = document.createElement("div");
+      callout.className = `callout callout-${type}`;
+      callout.innerHTML = `
+        <div class="callout-header">
+          <span class="callout-icon">${icon}</span>
+          <span class="callout-title">${escapeHtml(title)}</span>
+        </div>
+        <div class="callout-body">${body || escapeHtml(text.replace(/^\[!\w+\]\s*/, ""))}</div>`;
+      bq.replaceWith(callout);
+    }
   }
 
   private enhanceTaskLines(preview: HTMLElement): void {
