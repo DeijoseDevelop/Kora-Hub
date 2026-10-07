@@ -1,7 +1,7 @@
 {
   "name": "kora-hub-desktop",
   "private": true,
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Kora Hub — app de escritorio (Tauri 2, sidecar Go embebido)",
   "scripts": {
     "dev": "tauri dev",

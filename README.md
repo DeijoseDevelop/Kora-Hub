@@ -8,7 +8,7 @@ Write in Markdown. Keep your tasks *inside* your documents. Kora Hub turns them 
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![Nix.js](https://img.shields.io/badge/Nix.js-2.6-7c6cf0)](https://nix-js.dev)
+[![Elur](https://img.shields.io/badge/Elur-4.x-7c6cf0)](https://elur.dev)
 [![CI](https://img.shields.io/badge/CI-passing-3fb950?logo=githubactions&logoColor=white)](https://github.com/DeijoseDevelop/Kora-Hub/actions)
 
 [Website](https://zekrost.dev) · [Architecture](docs/ARCHITECTURE.md) · [Report a bug](https://github.com/DeijoseDevelop/Kora-Hub/issues)
@@ -37,25 +37,52 @@ That file *is* your project board. Complete a task in the kanban and it marks th
 ## Features
 
 **📄 Documents**
-- Markdown editor with live preview (CodeMirror 6) — LaTeX, Mermaid, syntax highlighting
+- Markdown editor with live preview (CodeMirror 6) — callouts, LaTeX math, footnotes
+- Slash commands (`/` to insert headings, tasks, tables, embeds)
+- Table of Contents (auto-generated from headings)
 - `[[Wiki-links]]`, backlinks and a relationship graph
 - Drag-and-drop attachments (local disk or S3-compatible)
-- Version history; the losing version is always preserved
+- Version history with visual diff; losing version is always preserved
 - Templates: proposal, meeting notes, RFC, retrospective
+- **Export**: HTML (self-contained), PDF (print), ICS (calendar feed)
 
 **✅ Embedded tasks**
 - Natural-language metadata: `#due-date @project !priority ~assignee +tag`
-- **Kanban, table and calendar views** — generated from the index, never stored
-- **Quick Add Magic**: press `Ctrl+K`, type `call client #tomorrow @sales !high`, done
+- Recurrence (`*every:1w`) and dependencies (`^blocked-by:`)
+- **Sub-tasks** via indentation — nested cards with progress bars
+- **Cycles/sprints** (`+cycle:name`) with progress tracking
+- **Kanban, table and calendar views** — sort, bulk actions, grouping, inline edit
+- **Quick Add Magic**: press `⌘K`, type `call client #tomorrow @sales !high`, done
 - Round-trip guaranteed: editing from any view rewrites the source line *byte for byte*
+
+**💡 Editor enhancements**
+- **Callouts** (`> [!note]`, `> [!tip]`, `> [!warning]`, `> [!danger]`, `> [!info]`…)
+- **LaTeX math**: `$inline$` and `$$block$$` formulas
+- **Footnotes** (`[^1]`) with auto-generated notes section
+- **Embeds**: YouTube, Vimeo, Spotify, audio/video (whitelisted domains)
+- **Dark mode** with toggle (follows `prefers-color-scheme`)
+
+**⚡ Navigation**
+- **Command palette** (`⌘K`) — actions, docs, tasks, fuzzy search
+- **Quick switcher** (`⌘P`) — jump to any document instantly
+- **Keyboard shortcuts** (`g+d/t/s/g/k` for navigation, `?` for help)
+- **Built-in help** (`?`) — features, shortcuts, syntax, tips
+
+**💬 Collaboration**
+- **Comments** per document (stored in filesystem)
+- **Activity feed** — recent changes across the workspace
+- **Share links** — public read-only documents
+- **Page icons** — emoji in title becomes sidebar icon
 
 **⚙️ Platform**
 - **Offline-first by design**: local command queue with replay, delta sync on reconnect
-- **One binary**: Go + SQLite + embedded frontend. One container, one volume, zero external dependencies — `<100 MB RAM`
-- **API-first**: everything the UI can do, the REST API can do (webhooks on the roadmap)
-- Full-text search (FTS5) with typo tolerance
+- **One binary**: Go + SQLite + embedded frontend. One container, one volume — `<100 MB RAM`
+- **API-first**: everything the UI can do, the REST API can do
+- **MCP server** (`POST /api/v1/mcp`) — same actions as UI for AI agents
+- Full-text search (FTS5) with local + server results
 - Workspaces with roles (owner / editor / viewer)
-- **PWA** installable; native iOS/Android via Capacitor sharing 100% of the code
+- **Import**: Obsidian vaults, Notion exports (ZIP)
+- **PWA** installable; native iOS/Android via Capacitor; desktop via Tauri
 
 ## Quickstart
 
@@ -84,11 +111,14 @@ Open [http://localhost:8080](http://localhost:8080).
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/editor.png" alt="Editor with live preview" width="49%" />
-  <img src="screenshots/table.png" alt="Tasks table" width="49%" />
+  <img src="screenshots/kanban.png" alt="Kanban view" width="49%" />
+  <img src="screenshots/kanban-dark.png" alt="Kanban dark mode" width="49%" />
   <br />
-  <img src="screenshots/calendar.png" alt="Calendar view" width="49%" />
-  <img src="screenshots/graph.png" alt="Knowledge graph" width="49%" />
+  <img src="screenshots/editor.png" alt="Editor with callouts, math, tasks" width="49%" />
+  <img src="screenshots/help.png" alt="Built-in help" width="49%" />
+  <br />
+  <img src="screenshots/search.png" alt="Search" width="49%" />
+  <img src="screenshots/palette.png" alt="Command palette" width="49%" />
 </p>
 
 ## Desktop app
@@ -126,7 +156,7 @@ Requirements: [Go 1.26+](https://go.dev/dl), [Node.js 22+](https://nodejs.org), 
 git clone git@github.com:DeijoseDevelop/Kora-Hub.git
 cd Kora-Hub
 
-make frontend   # build the Nix.js frontend and embed it
+make frontend   # build the Elur frontend and embed it
 make generate   # regenerate sqlc code
 make dev        # Go backend on :8080
 ```
@@ -150,13 +180,13 @@ npm run dev     # Vite dev server on :5173 (proxies /api → :8080)
 ```
 ┌───────────────────────────────────────────────┐
 │ CLIENT — one codebase                         │
-│ Nix.js SPA → PWA (browser) | Capacitor (apps)  │
+│ Elur SPA → PWA (browser) | Capacitor (apps)   │
 │ Offline queue (IndexedDB) + delta sync         │
 └──────────────────────────┬────────────────────┘
                            │ HTTPS / REST (JSON)
 ┌──────────────────────────▼────────────────────┐
 │ GO BINARY — one process                       │
-│ Gin · JWT · task parser · FTS5 · webhooks      │
+│ Gin · JWT · task parser · FTS5 · MCP           │
 │ ├─ SQLite (modernc) — index & cache            │
 │ ├─ Markdown store — canonical files            │
 │ └─ Attachments — S3 interface (local/R2/MinIO) │
@@ -170,7 +200,7 @@ npm run dev     # Vite dev server on :5173 (proxies /api → :8080)
 4. API-first: the UI is just another client.
 5. Budget: <100 MB RAM per instance, <10 s cold start.
 
-**Stack:** Go 1.26 · Gin v1.12 · sqlc v1.31 · SQLite (FTS5) · Nix.js 2.6 · CodeMirror 6 · FlexSearch · Capacitor 8 · GitHub Actions + GoReleaser
+**Stack:** Go 1.26 · Gin v1.12 · sqlc v1.31 · SQLite (FTS5) · Elur 4.x · CodeMirror 6 · Capacitor 8 · Tauri 2 · GitHub Actions + GoReleaser
 
 ## API
 

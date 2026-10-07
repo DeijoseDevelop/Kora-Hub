@@ -11,14 +11,14 @@ This document describes the technical architecture of Kora Hub. It is a public, 
 | P3 | **One artifact** | A single Go binary with an embedded frontend and SQLite by default; one container, one volume, zero external dependencies |
 | P4 | **API-first** | Everything the UI can do exists in the versioned public REST API; the UI is just another client |
 | P5 | **Resource budget** | <100 MB RAM per instance, <10 s cold start; every feature is evaluated against this budget |
-| P6 | **One client codebase** | Nix.js compiles to web/PWA and native apps via Capacitor, no extra UI framework |
+| P6 | **One client codebase** | Elur compiles to web/PWA and native apps via Capacitor, no extra UI framework |
 
 ## High-level view
 
 ```
 ┌───────────────────────────────────────────────┐
 │ CLIENT — one codebase                         │
-│ Nix.js SPA → PWA (browser) | Capacitor (apps)  │
+│ Elur SPA → PWA (browser) | Capacitor (apps)  │
 │ signals · html`` · router · stores · Nix Query │
 │ Local persistence: IndexedDB / SQLite-WASM     │
 │ Offline queue (CommandQueueAdapter) + delta    │
@@ -40,7 +40,7 @@ This document describes the technical architecture of Kora Hub. It is a public, 
 | ADR-01 | Go backend | NestJS/Node (more RAM), Rust (slower dev), Elixir (small ecosystem) |
 | ADR-02 | Embedded SQLite by default | Postgres-only (breaks P3 and the one-liner Docker) |
 | ADR-03 | sqlc instead of an ORM | GORM/Ent (reflection, magic, RAM) |
-| ADR-04 | Nix.js embedded with `embed.FS` | Separate SPA artifact, SSR |
+| ADR-04 | Elur embedded with `embed.FS` | Separate SPA artifact, SSR |
 | ADR-05 | Capacitor directly, no Ionic | Nix Ionic (extra layer for a productivity app) |
 | ADR-06 | Delta sync + LWW; CRDT deferred | CRDT from day one (6 months of complexity) |
 | ADR-07 | Stateless JWT + rotating refresh | Server-side sessions (shared state) |
@@ -59,11 +59,11 @@ internal/
   search/         → FTS5
   graph/          → backlink extraction for the graph view
   server/         → Gin router, REST v1 handlers
-  web/            → embedded Nix.js frontend (embed.FS)
+  web/            → embedded Elur frontend (embed.FS)
 db/
   migrations/     → forward-only versioned SQL
   queries/        → sqlc queries
-web/              → Nix.js frontend (Vite + Capacitor)
+web/              → Elur frontend (Vite + Capacitor)
 ```
 
 ## Data model: files + index

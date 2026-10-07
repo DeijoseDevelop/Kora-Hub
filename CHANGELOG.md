@@ -4,7 +4,7 @@ Todos los cambios notables de Kora Hub se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 [Semantic Versioning](https://semver.org/lang/es/).
 
-## [Unreleased]
+## [1.0.0] — 2026-10-07
 
 ### Added
 
