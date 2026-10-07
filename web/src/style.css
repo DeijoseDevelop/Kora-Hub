@@ -2444,6 +2444,8 @@ kbd {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
     --bg: var(--n-950);
     --bg-soft: var(--n-900);
     --bg-elevated: var(--n-800);
@@ -2485,6 +2487,8 @@ kbd {
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   --bg: var(--n-950);
   --bg-soft: var(--n-900);
   --bg-elevated: var(--n-800);
@@ -3343,4 +3347,38 @@ kbd {
 
 .help-btn kbd {
   margin-left: auto;
+}
+
+/* Options de select nativos: en dark mode los navegadores no heredan
+   colores CSS de option — hay que fijarlos explícitamente. */
+:root[data-theme="dark"] select option {
+  background: var(--n-800);
+  color: var(--n-50);
+}
+
+:root[data-theme="dark"] select option:checked {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+:root[data-theme="dark"] select option:hover,
+:root[data-theme="dark"] select option:focus {
+  background: var(--n-700);
+  color: var(--n-50);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) select option {
+    background: var(--n-800);
+    color: var(--n-50);
+  }
+  :root:not([data-theme="light"]) select option:checked {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  :root:not([data-theme="light"]) select option:hover,
+  :root:not([data-theme="light"]) select option:focus {
+    background: var(--n-700);
+    color: var(--n-50);
+  }
 }
