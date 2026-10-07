@@ -1,4 +1,4 @@
-import { mount } from "@deijose/nix-js";
+import { mount } from "@elurjs/core";
 import { App } from "./app/App";
 import { initSyncAuto } from "./sync/client";
 import { initLocal } from "./data/store";

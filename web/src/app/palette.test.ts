@@ -1,4 +1,4 @@
-import { render } from "@deijose/nix-js-testing";
+import { render } from "@elurjs/core-testing";
 import { describe, expect, test } from "vitest";
 import { CommandPalette } from "./CommandPalette";
 

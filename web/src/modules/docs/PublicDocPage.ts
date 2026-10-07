@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
-import { NixComponent, html, ref, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, ref, signal, type ElurTemplate } from "@elurjs/core";
 import { marked } from "marked";
 import { router } from "../../router";
 import { publicDocsApi, type PublicDoc } from "../../api/client";
@@ -12,7 +12,7 @@ import { t } from "../../i18n";
 // sin sesión, sin mirror local, sin controles de edición. El contenido
 // llega del endpoint público y se renderiza como Markdown (misma
 // configuración que el preview del editor).
-export class PublicDocPage extends NixComponent {
+export class PublicDocPage extends ElurComponent {
   private doc = signal<PublicDoc | null>(null);
   private error = signal("");
   private bodyRef = ref<HTMLDivElement>();
@@ -47,7 +47,7 @@ export class PublicDocPage extends NixComponent {
     }
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="page public-page">
         ${() => this.error.value

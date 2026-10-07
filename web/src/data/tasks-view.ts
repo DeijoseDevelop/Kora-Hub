@@ -1,4 +1,4 @@
-import { signal } from "@deijose/nix-js";
+import { signal } from "@elurjs/core";
 
 // Vista de tareas compartida entre el header (topbar) y TasksPage.
 // El header navega y setea la vista; las pestañas internas también.

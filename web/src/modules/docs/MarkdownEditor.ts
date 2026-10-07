@@ -1,4 +1,4 @@
-import { NixComponent, html, ref, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, ref, type ElurTemplate } from "@elurjs/core";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
@@ -72,14 +72,14 @@ const koraHighlight = HighlightStyle.define([
   { tag: t.processingInstruction, color: "var(--text-faint)" },
 ]);
 
-// Editor como NixComponent (sección 7.2): ref() al contenedor, instancia
+// Editor como ElurComponent (sección 7.2): ref() al contenedor, instancia
 // de CodeMirror en onMount() y cleanup automático al desmontar. Sin
 // wrappers: CodeMirror es DOM-first.
 //
 // Nota: el contenido NO se sincroniza a una signal por keystroke (eso
 // disparaba un loop de re-mount del subárbol embebido, detectado en
 // E2E). Se expone onChange como callback plano para la preview.
-export class MarkdownEditor extends NixComponent {
+export class MarkdownEditor extends ElurComponent {
   private container = ref<HTMLDivElement>();
   private view: EditorView | null = null;
   private initial: string;
@@ -93,7 +93,7 @@ export class MarkdownEditor extends NixComponent {
     this.onFile = onFile;
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`<div class="doc-editor" ref=${this.container}></div>`;
   }
 

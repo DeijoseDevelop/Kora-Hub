@@ -1,4 +1,4 @@
-import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
 import { authApi, getToken, setSession } from "../../api/client";
 import { router } from "../../router";
 import { showToast } from "../../ui/kit";
@@ -6,7 +6,7 @@ import { t } from "../../i18n";
 
 // Pantalla Auth: tabs "Entrar" / "Crear cuenta". En el primer arranque
 // (sin usuarios registrados) "Crear cuenta" es la opción por defecto.
-export class HomePage extends NixComponent {
+export class HomePage extends ElurComponent {
   private mode = signal<"login" | "register">("login");
   private email = signal("");
   private password = signal("");
@@ -42,7 +42,7 @@ export class HomePage extends NixComponent {
       .catch((e: Error) => showToast(e.message));
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="login-view">
         <div class="login-card">

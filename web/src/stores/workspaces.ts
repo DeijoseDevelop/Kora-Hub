@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
-import { createStore } from "@deijose/nix-js";
+import { createStore } from "@elurjs/core";
 import { persist } from "../plugins/persist";
 
 export interface Workspace {

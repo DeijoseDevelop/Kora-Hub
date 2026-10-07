@@ -1,4 +1,4 @@
-import { signal } from "@deijose/nix-js";
+import { signal } from "@elurjs/core";
 
 // Workspace activo de la UI. Las llamadas a la API incluyen
 // ?workspace=<id> y el mirror local filtra por él.

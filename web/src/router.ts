@@ -1,4 +1,4 @@
-import { createRouter, type RouteRecord } from "@deijose/nix-js";
+import { createRouter, type RouteRecord } from "@elurjs/core";
 import { HomePage } from "./modules/home/HomePage";
 import { DocsPage } from "./modules/docs/DocsPage";
 import { DocEditorPage } from "./modules/docs/DocEditorPage";

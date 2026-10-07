@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
-import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
 import { workspacesApi, type Member } from "../../api/client";
 import { showToast } from "../../ui/kit";
 import { t } from "../../i18n";
@@ -8,7 +8,7 @@ import { t } from "../../i18n";
 // Panel de miembros de un workspace (solo owners lo ven): lista,
 // invitación por email y cambio de rol/expulsión. El backend es la
 // autoridad — la UI solo refleja (sección 4.3).
-export class MembersPanel extends NixComponent {
+export class MembersPanel extends ElurComponent {
   private wsId: string;
   private wsName: string;
   private members = signal<Member[]>([]);
@@ -65,7 +65,7 @@ export class MembersPanel extends NixComponent {
     }
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="members-panel">
         ${() =>

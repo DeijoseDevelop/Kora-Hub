@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { render } from "@deijose/nix-js-testing";
+import { render } from "@elurjs/core-testing";
 import { test } from "vitest";
 import { setLocale } from "../../i18n";
 import { HomePage } from "./HomePage";

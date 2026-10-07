@@ -94,7 +94,7 @@ func securityHeaders() gin.HandlerFunc {
 		if len(c.Request.URL.Path) < 5 || c.Request.URL.Path[:5] != "/api/" {
 			h.Set("Content-Security-Policy",
 				"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
-					"img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; "+
+					"img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; "+
 					"worker-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'")
 		}
 		c.Next()

@@ -1,4 +1,4 @@
-import { NixComponent, effect, html, ref, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, effect, html, ref, type ElurTemplate } from "@elurjs/core";
 import { router } from "../../router";
 import { localDocs } from "../../data/store";
 import { activeWs } from "../../data/workspace";
@@ -22,7 +22,7 @@ interface GEdge {
 
 // Grafo local-first: nodos = docs del mirror, aristas = backlinks
 // [[wikilinks]] extraídos localmente. 100% offline.
-export class GraphPage extends NixComponent {
+export class GraphPage extends ElurComponent {
   private canvasRef = ref<HTMLCanvasElement>();
   private nodes: GNode[] = [];
   private edges: GEdge[] = [];
@@ -31,7 +31,7 @@ export class GraphPage extends NixComponent {
   private rect = { width: 0, height: 0 };
   private dragging: GNode | null = null;
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="view-graph">
         <canvas class="graph-canvas" ref=${this.canvasRef}></canvas>

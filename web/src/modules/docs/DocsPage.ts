@@ -1,4 +1,4 @@
-import { NixComponent, html, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, type ElurTemplate } from "@elurjs/core";
 import { router } from "../../router";
 import { currentRole } from "../../api/role";
 import { localDocs } from "../../data/store";
@@ -9,8 +9,8 @@ import { t } from "../../i18n";
 import { DOC_TEMPLATES, templateDesc, templateLabel } from "../../data/templates";
 
 // Lista de documentos leída del mirror local (funciona offline).
-export class DocsPage extends NixComponent {
-  render(): NixTemplate {
+export class DocsPage extends ElurComponent {
+  render(): ElurTemplate {
     return html`
       <div class="page">
         <div class="page-header">

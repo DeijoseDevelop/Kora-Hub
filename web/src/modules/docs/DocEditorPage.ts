@@ -1,4 +1,4 @@
-import { NixComponent, html, ref, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, ref, signal, type ElurTemplate } from "@elurjs/core";
 import { marked } from "marked";
 import { router } from "../../router";
 import { getLocalDocById, saveDocLocal } from "../../data/mutations";
@@ -13,7 +13,7 @@ import { t } from "../../i18n";
 
 // Vista de edición local-first: el documento se lee del mirror (100%
 // offline); el guardado escribe el mirror, reindexa y encola el sync.
-export class DocEditorPage extends NixComponent {
+export class DocEditorPage extends ElurComponent {
   private editor = new MarkdownEditor("", (text) => this.updatePreview(text), (f) => this.uploadAttachment(f));
   private status = signal("");
   private current: { id: string; path: string; title: string; serverId?: string } | null = null;
@@ -45,7 +45,7 @@ export class DocEditorPage extends NixComponent {
     this.updatePreview(doc.content);
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="page">
         <div class="page-header">

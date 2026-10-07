@@ -1,4 +1,4 @@
-import { NixComponent, RouterView, html, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, RouterView, html, signal, type ElurTemplate } from "@elurjs/core";
 import { CommandPalette } from "./CommandPalette";
 import { router } from "../router";
 import { workspacesApi } from "../api/client";
@@ -15,7 +15,7 @@ const WS_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#8b5c
 
 // Shell: sidebar (workspaces + docs locales + búsqueda) y topbar.
 // Los documentos leen del mirror local (100% offline).
-export class App extends NixComponent {
+export class App extends ElurComponent {
   private palette = new CommandPalette();
   private online = signal(navigator.onLine);
   private pending = signal(0);
@@ -94,7 +94,7 @@ export class App extends NixComponent {
     if (ws) await bootstrapLocal(ws);
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     // Gate: el shell permanece montado (RouterView estable) y se oculta
     // sin sesión; la pantalla auth se superpone. Evita re-mounts del
     // RouterView en transiciones de sesión.

@@ -4,7 +4,7 @@
 // Regla de uso: toda cadena visible va por t() dentro de un binding
 // reactivo ${() => t("clave")} para que el switch re-renderice.
 // Los catálogos se cargan eager (son ~4 KB; la división no compensa).
-import { signal } from "@deijose/nix-js";
+import { signal } from "@elurjs/core";
 import { es } from "./es";
 import { en } from "./en";
 

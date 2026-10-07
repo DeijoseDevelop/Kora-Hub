@@ -1,4 +1,4 @@
-import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
 import { router } from "../router";
 import { localDocs, localTasks } from "../data/store";
 import { activeWs } from "../data/workspace";
@@ -18,7 +18,7 @@ interface PaletteItem {
 
 // Command palette (Ctrl+K) local-first: busca en el índice local
 // (docs + tareas) — funciona sin conexión.
-export class CommandPalette extends NixComponent {
+export class CommandPalette extends ElurComponent {
   private open = signal(false);
   private query = signal("");
   private selected = signal(0);
@@ -157,7 +157,7 @@ export class CommandPalette extends NixComponent {
     }
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     const groupLabel: Record<PaletteKind, string> = {
       action: t("palette.actions"), doc: t("palette.docs"), task: t("palette.tasks"),
     };

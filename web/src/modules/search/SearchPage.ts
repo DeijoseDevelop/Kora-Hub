@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
-import { NixComponent, html, ref, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, ref, signal, type ElurTemplate } from "@elurjs/core";
 import { localDocs, localTasks } from "../../data/store";
 import { activeWs } from "../../data/workspace";
 import { searchApi, getToken } from "../../api/client";
@@ -21,7 +21,7 @@ type Hit = {
 // El input NO usa signal para el texto: en Nix.js cambiar un signal del
 // componente recrea el subárbol y resetea el campo. Se lee del DOM vía
 // ref y solo los resultados viven en signals.
-export class SearchPage extends NixComponent {
+export class SearchPage extends ElurComponent {
   private hits = signal<Hit[]>([]);
   private searching = signal(false);
   private hasQuery = signal(false);
@@ -111,7 +111,7 @@ export class SearchPage extends NixComponent {
     router.navigate("/docs/" + hit.id);
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="page">
         <div class="page-header">

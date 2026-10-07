@@ -1,5 +1,5 @@
-import { NixComponent, html, type NixTemplate } from "@deijose/nix-js";
-import { createQuery } from "@deijose/nix-query";
+import { ElurComponent, html, type ElurTemplate } from "@elurjs/core";
+import { createQuery } from "@elurjs/query";
 import { authApi, clearToken, getToken, workspacesApi } from "../../api/client";
 import { pull } from "../../sync/client";
 import { showToast } from "../../ui/kit";
@@ -34,13 +34,13 @@ function logout(): void {
 // Página como clase: onMount refetchea (los queries module-level se
 // crean antes del login y no se re-ejecutan solos — mismo patrón que
 // TasksPage/DocsPage).
-export class SettingsPage extends NixComponent {
+export class SettingsPage extends ElurComponent {
   onMount(): void {
     ws.refetch();
     me.refetch();
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <section class="page">
         <div class="page-header">

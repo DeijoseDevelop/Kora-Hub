@@ -1,4 +1,4 @@
-import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
+import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
 import { localTasks } from "../../data/store";
 import { activeWs } from "../../data/workspace";
 import { tasksView } from "../../data/tasks-view";
@@ -85,7 +85,7 @@ async function removeView(id: string): Promise<void> {
   }
 }
 
-function viewsBar(): NixTemplate {
+function viewsBar(): ElurTemplate {
   return html`
     <div class="views-bar">
       <select @change=${(ev: Event) => {
@@ -174,7 +174,7 @@ function isBlocked(t: LocalTask): boolean {
   return blocker != null && !blocker.done;
 }
 
-function taskBadges(t: LocalTask): NixTemplate {
+function taskBadges(t: LocalTask): ElurTemplate {
   return html`
     ${t.dueDate
       ? html`<span class=${"badge" + " date" + (isOverdue(t.dueDate) ? " overdue" : "")}>${formatDate(t.dueDate)}</span>`
@@ -188,7 +188,7 @@ function taskBadges(t: LocalTask): NixTemplate {
 
 // ---------------------------- Kanban ----------------------------
 
-function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter: () => LocalTask[]): NixTemplate {
+function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter: () => LocalTask[]): ElurTemplate {
   return html`
     <div class=${"kanban-col" + " " + dot}>
       <div class="kanban-col-header">
@@ -245,7 +245,7 @@ function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter
   `;
 }
 
-function kanbanView(): NixTemplate {
+function kanbanView(): ElurTemplate {
   return html`
     <div class="kanban-toolbar">
       <div class="quick-add">
@@ -269,7 +269,7 @@ function kanbanView(): NixTemplate {
 
 // ---------------------------- Tabla ----------------------------
 
-function tablaView(): NixTemplate {
+function tablaView(): ElurTemplate {
   const rows = localTasks.value.filter((t) => {
     const [proyecto, done] = tableParams.value;
     if (t.workspaceId !== activeWs.value) return false;
@@ -333,7 +333,7 @@ function tablaView(): NixTemplate {
 
 // -------------------------- Calendario --------------------------
 
-function calendarioView(): NixTemplate {
+function calendarioView(): ElurTemplate {
   const range = calRange.value;
   const y = Number(range[0].slice(0, 4));
   const m = Number(range[0].slice(5, 7)) - 1;
@@ -386,12 +386,12 @@ function calendarioView(): NixTemplate {
 
 // ----------------------------- Page -----------------------------
 
-export class TasksPage extends NixComponent {
+export class TasksPage extends ElurComponent {
   onMount(): void {
     void loadViews();
   }
 
-  render(): NixTemplate {
+  render(): ElurTemplate {
     return html`
       <div class="page">
         <div class="page-header">

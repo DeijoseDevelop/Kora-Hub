@@ -1,4 +1,4 @@
-import { signal } from "@deijose/nix-js";
+import { signal } from "@elurjs/core";
 import { getLocalDocs, getLocalTasks, reindexAll, type LocalDoc, type LocalTask } from "../sync/local";
 import { pull } from "../sync/client";
 import { activeWs } from "./workspace";
