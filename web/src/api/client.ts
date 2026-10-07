@@ -44,21 +44,27 @@ const EXPIRES_KEY = "hub:expires";
 const API_BASE_KEY = "hub:api-base";
 
 function isNative(): boolean {
-  return typeof (window as any).Capacitor !== "undefined" &&
-    (window as any).Capacitor?.isNativePlatform?.() === true;
+  try {
+    return typeof (window as any).Capacitor !== "undefined" &&
+      (window as any).Capacitor?.isNativePlatform?.() === true;
+  } catch {
+    return false;
+  }
+}
+
+export function needsServerUrl(): boolean {
+  return isNative() && !localStorage.getItem(API_BASE_KEY);
 }
 
 export function getApiBase(): string {
   const stored = localStorage.getItem(API_BASE_KEY) ?? "";
-  if (stored) return stored.replace(/\/+$/, "");
-  // default: el mismo origen (web/PWA). Para Capacitor el usuario debe
-  // configurarlo en Ajustes (p. ej. http://192.168.1.10:8080)
-  return isNative() ? "" : "";
+  return stored.replace(/\/+$/, "");
 }
 
 export function setApiBase(url: string): void {
-  if (url) {
-    localStorage.setItem(API_BASE_KEY, url.replace(/\/+$/, ""));
+  const clean = url.replace(/\/+$/, "").replace(/^https?:\/\/$/, "");
+  if (clean) {
+    localStorage.setItem(API_BASE_KEY, clean);
   } else {
     localStorage.removeItem(API_BASE_KEY);
   }
@@ -66,6 +72,25 @@ export function setApiBase(url: string): void {
 
 function apiUrl(path: string): string {
   return getApiBase() + path;
+}
+
+// safeJSON parsea una respuesta HTTP solo si es JSON real. Si el
+// servidor devuelve HTML (404 de Capacitor, proxy, etc.) lanza un error
+// legible en vez de "Unexpected token '<'".
+async function safeJSON<T>(res: Response): Promise<T> {
+  const text = await res.text().catch(() => "");
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("<") || trimmed.includes("<!DOCTYPE")) {
+    throw new Error(
+      "El servidor no respondió JSON. Si usas la app nativa, configura la URL del servidor en el login (ej: http://192.168.1.10:8080).",
+    );
+  }
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Respuesta inesperada del servidor (HTTP ${res.status})`);
+  }
 }
 
 export function getToken(): string | null {
@@ -116,7 +141,7 @@ export function refreshSession(): Promise<boolean> {
           body: JSON.stringify({ refresh_token: refresh }),
         });
         if (!res.ok) return false;
-        const session = await res.json();
+        const session = await safeJSON<{access_token: string; refresh_token: string; expires_in?: number}>(res);
         setSession(session);
         return true;
       } catch {
@@ -153,11 +178,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     window.dispatchEvent(new CustomEvent("hub:logout"));
   }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+    const body = await safeJSON<{ error?: { message?: string } }>(res).catch(() => ({} as Record<string, unknown>));
+    throw new Error((body as { error?: { message?: string } })?.error?.message ?? `HTTP ${res.status}`);
   }
   if (res.status === 204) return undefined as T;
-  return res.json();
+  return safeJSON<T>(res);
 }
 
 function api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -256,7 +281,7 @@ export const publicDocsApi = {
       const body = await res.json().catch(() => ({}));
       throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
     }
-    return res.json();
+    return safeJSON<any>(res);
   },
 };
 
@@ -276,7 +301,7 @@ export const attachmentsApi = {
       const body = await res.json().catch(() => ({}));
       throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
     }
-    return res.json();
+    return safeJSON<any>(res);
   },
   remove: (id: string, workspace: string) =>
     api<void>(`/attachments/${id}?workspace=${workspace}`, { method: "DELETE" }),
@@ -384,7 +409,7 @@ export const workspacesApi = {
       const body = await res.json().catch(() => ({}));
       throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
     }
-    return res.json();
+    return safeJSON<any>(res);
   },
 };
 

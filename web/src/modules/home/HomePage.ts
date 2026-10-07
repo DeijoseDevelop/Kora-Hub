@@ -1,5 +1,5 @@
 import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
-import { authApi, getToken, setSession, getApiBase, setApiBase } from "../../api/client";
+import { authApi, getToken, setSession, getApiBase, setApiBase, needsServerUrl } from "../../api/client";
 import { router } from "../../router";
 import { showToast } from "../../ui/kit";
 import { t } from "../../i18n";
@@ -28,12 +28,26 @@ export class HomePage extends ElurComponent {
     }
     void authApi.status().then(({ has_users }) => {
       if (!has_users) this.mode.value = "register";
-    }).catch(() => undefined);
+    }).catch((e: Error) => {
+      // en nativo sin URL configurada, avisar de forma clara
+      if (isNative() && needsServerUrl()) {
+        showToast(t("auth.server_required"));
+      }
+    });
   }
 
   private submit(): void {
     if (isNative()) {
-      setApiBase(this.serverUrl.value.trim());
+      const url = this.serverUrl.value.trim();
+      if (!url) {
+        showToast(t("auth.server_required"));
+        return;
+      }
+      if (!/^https?:\/\/.+/.test(url)) {
+        showToast(t("auth.server_invalid"));
+        return;
+      }
+      setApiBase(url);
     }
     if (this.password.value.length < 8) {
       showToast(t("auth.pw_short"));
