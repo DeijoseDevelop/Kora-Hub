@@ -2817,3 +2817,84 @@ kbd {
   font-size: var(--t-caption);
   white-space: nowrap;
 }
+
+/* Board grouping */
+.kanban-grouped {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.kanban-group {
+  margin-bottom: var(--s-5);
+}
+
+.kanban-group-label {
+  font-size: var(--t-md);
+  font-weight: 600;
+  margin: 0 0 var(--s-2);
+  padding: 0 var(--s-5);
+  color: var(--text);
+}
+
+.group-select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  padding: 4px var(--s-2);
+  font-size: var(--t-caption);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.group-select:hover {
+  border-color: var(--accent);
+}
+
+/* Inline edit en tabla */
+.inline-edit {
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: var(--t-base);
+  color: var(--text);
+  width: 100%;
+  max-width: 300px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Emoji como icono de doc */
+.doc-emoji {
+  font-size: 14px;
+  line-height: 1;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Slash commands dropdown de CodeMirror */
+.cm-tooltip-autocomplete {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+}
+
+.cm-tooltip-autocomplete > ul > li {
+  padding: 5px var(--s-3);
+  color: var(--text);
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.cm-tooltip-autocomplete > ul > li .cm-completionDetail {
+  color: var(--text-faint);
+  font-style: normal;
+  margin-left: var(--s-2);
+}

@@ -2,9 +2,46 @@ import { ElurComponent, html, ref, type ElurTemplate } from "@elurjs/core";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { autocompletion, completeFromList, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
+
+// Slash commands: '/' al inicio de línea o tras espacio abre un menú
+// de inserción Markdown (estilo Notion).
+const SLASH_COMMANDS = [
+  { label: "/h1", detail: "Encabezado 1", apply: "# " },
+  { label: "/h2", detail: "Encabezado 2", apply: "## " },
+  { label: "/h3", detail: "Encabezado 3", apply: "### " },
+  { label: "/bold", detail: "Negrita", apply: "****" },
+  { label: "/italic", detail: "Cursiva", apply: "**" },
+  { label: "/code", detail: "Código inline", apply: "``" },
+  { label: "/codeblock", detail: "Bloque de código", apply: "```\n\n```" },
+  { label: "/list", detail: "Lista", apply: "- " },
+  { label: "/check", detail: "Tarea", apply: "- [ ] " },
+  { label: "/numbered", detail: "Lista numerada", apply: "1. " },
+  { label: "/quote", detail: "Cita", apply: "> " },
+  { label: "/hr", detail: "Separador", apply: "---\n" },
+  { label: "/link", detail: "Enlace", apply: "[](url)" },
+  { label: "/image", detail: "Imagen", apply: "![](url)" },
+  { label: "/table", detail: "Tabla", apply: "| Columna | Columna |\n|---------|----------|\n| celda   | celda    |" },
+  { label: "/task", detail: "Tarea con fecha", apply: "- [ ] Nueva tarea #hoy" },
+];
+
+function slashComplete(ctx: CompletionContext): CompletionResult | null {
+  const word = ctx.matchBefore(/\/[a-z]*/);
+  if (!word || (word.from === word.to && !ctx.explicit)) return null;
+  return {
+    from: word.from,
+    options: SLASH_COMMANDS.map((c) => ({
+      label: c.label,
+      detail: c.detail,
+      apply: c.apply,
+      type: "keyword",
+    })),
+    validFor: /^\/[a-z]*$/,
+  };
+}
 
 // Theme claro del design system v3: superficies neutras, un solo acento
 // cian, tipografía mono para el cuerpo. Sustituye a oneDark (oscuro)
@@ -108,6 +145,11 @@ export class MarkdownEditor extends ElurComponent {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         markdown(),
+        autocompletion({
+          override: [slashComplete],
+          icons: false,
+          activateOnTyping: true,
+        }),
         koraLight,
         syntaxHighlighting(koraHighlight),
         EditorView.lineWrapping,

@@ -63,6 +63,28 @@ export async function getLocalDocById(id: string): Promise<LocalDoc | undefined>
   return localDB.docs.get(id);
 }
 
+// setTaskTitleLocal actualiza el título de una tarea reescribiendo la
+// línea en el Markdown canónico (round-trip con el texto nuevo).
+export async function setTaskTitleLocal(task: LocalTask, newTitle: string): Promise<void> {
+  const doc = await localDB.docs.get(task.docId);
+  if (!doc) return;
+  const tasks = parse(doc.content);
+  const t = tasks.find((p) => p.line === task.lineNo);
+  if (!t) return;
+  const lines = doc.content.split("\n");
+  // reconstruir la línea preservando metadatos, cambiando solo el texto
+  const meta = [t.dueDate ? `#${t.dueDate}` : "", t.project ? `@${t.project}` : "",
+    t.priority ? `!${t.priority}` : "", t.assignee ? `~${t.assignee}` : "",
+    ...t.tags.map((tag) => `+${tag}`),
+    t.recur ? `*every:${t.recur}` : "",
+    t.taskUid ? `^id:${t.taskUid}` : "",
+    t.blockedBy ? `^blocked-by:${t.blockedBy}` : "",
+  ].filter(Boolean).join(" ");
+  const state = t.done ? "x" : t.inProgress ? "~" : " ";
+  lines[t.line - 1] = `- [${state}] ${newTitle}${meta ? " " + meta : ""}`;
+  await saveDocLocal({ id: doc.id, path: doc.path, title: doc.title, content: lines.join("\n") });
+}
+
 // toggleTaskLocal: round-trip local (la línea se reescribe al byte) y
 // todo el doc se sincroniza.
 export async function toggleTaskLocal(task: LocalTask): Promise<void> {

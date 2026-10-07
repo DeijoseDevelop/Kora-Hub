@@ -2,7 +2,7 @@ import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
 import { localTasks } from "../../data/store";
 import { activeWs } from "../../data/workspace";
 import { tasksView } from "../../data/tasks-view";
-import { toggleTaskLocal, quickAddLocal, setTaskStateLocal } from "../../data/mutations";
+import { toggleTaskLocal, quickAddLocal, setTaskStateLocal, setTaskTitleLocal } from "../../data/mutations";
 import { currentRole } from "../../api/role";
 import { formatDate, isOverdue, showPrompt, showToast } from "../../ui/kit";
 import { t as tr, tList, locale } from "../../i18n";
@@ -284,12 +284,43 @@ function kanbanView(): ElurTemplate {
         <button class="quick-add-btn" @click=${() => void quickAdd()}>${() => tr("tasks.add")}</button>
       </div>
       <span class="quick-add-hint">${() => tr("tasks.quick_hint")}</span>
+      <select class="group-select" value=${() => groupBy.value}
+        @change=${(ev: Event) => (groupBy.value = (ev.target as HTMLSelectElement).value as typeof groupBy.value)}>
+        <option value="">${() => tr("tasks.group_none")}</option>
+        <option value="project">${() => tr("tasks.group_project")}</option>
+        <option value="assignee">${() => tr("tasks.group_assignee")}</option>
+        <option value="priority">${() => tr("tasks.group_priority")}</option>
+      </select>
     </div>
-    <div class="kanban-board">
-      ${() => kanbanColumn(tr("tasks.todo"), "todo", " ", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && !t.inProgress))}
-      ${() => kanbanColumn(tr("tasks.doing"), "doing", "~", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && t.inProgress))}
-      ${() => kanbanColumn(tr("tasks.done"), "done", "x", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && t.done))}
-    </div>
+    ${() => {
+      const ws = activeWs.value;
+      const all = localTasks.value.filter((t) => t.workspaceId === ws);
+      const gb = groupBy.value;
+      if (!gb) {
+        return html`<div class="kanban-board">
+          ${kanbanColumn(tr("tasks.todo"), "todo", " ", () => all.filter((t) => !t.done && !t.inProgress))}
+          ${kanbanColumn(tr("tasks.doing"), "doing", "~", () => all.filter((t) => !t.done && t.inProgress))}
+          ${kanbanColumn(tr("tasks.done"), "done", "x", () => all.filter((t) => t.done))}
+        </div>`;
+      }
+      const groups = new Map<string, typeof all>();
+      for (const t of all) {
+        const key = gb === "project" ? (t.project ?? "—") : gb === "assignee" ? (t.assignee ?? "—") : (t.priority ?? "—");
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(t);
+      }
+      return html`<div class="kanban-grouped">
+        ${[...groups.entries()].map(([key, tasks]) => html`
+          <div class="kanban-group">
+            <h3 class="kanban-group-label">${gb === "project" ? "@" + key : key} <span class="muted">(${tasks.length})</span></h3>
+            <div class="kanban-board">
+              ${kanbanColumn(tr("tasks.todo"), "todo", " ", () => tasks.filter((t) => !t.done && !t.inProgress))}
+              ${kanbanColumn(tr("tasks.doing"), "doing", "~", () => tasks.filter((t) => !t.done && t.inProgress))}
+              ${kanbanColumn(tr("tasks.done"), "done", "x", () => tasks.filter((t) => t.done))}
+            </div>
+          </div>`)}
+      </div>`;
+    }}
     <p class="muted" style="padding: 0 20px 14px">${() => tr("tasks.drag_hint")}</p>
   `;
 }
@@ -298,6 +329,8 @@ function kanbanView(): ElurTemplate {
 
 const tableSort = signal<{ col: string; dir: 1 | -1 }>({ col: "dueDate", dir: 1 });
 const selectedIds = signal<Set<string>>(new Set());
+const groupBy = signal<"" | "project" | "assignee" | "priority">("");
+const editingCell = signal<{ id: string; field: string } | null>(null);
 
 function tablaView(): ElurTemplate {
   const filtered = () => {
@@ -398,7 +431,20 @@ function tablaView(): ElurTemplate {
                   <td>
                     <button class=${"mini-checkbox" + (t.done ? " checked" : "")} aria-label="completar"
                       @click=${() => void toggle(t)}></button>
-                    <span class=${t.done ? "task-text-done" : ""}>${t.title}</span>
+                    ${editingCell.value?.id === t.id && editingCell.value?.field === "title"
+          ? html`<input class="inline-edit" value=${t.title}
+                        @blur=${(ev: Event) => {
+                      const val = (ev.target as HTMLInputElement).value.trim();
+                      if (val && val !== t.title) void setTaskTitleLocal(t, val);
+                      editingCell.value = null;
+                    }}
+                        @keydown=${(ev: KeyboardEvent) => {
+                      if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+                      if (ev.key === "Escape") editingCell.value = null;
+                    }} autofocus />`
+          : html`<span class=${t.done ? "task-text-done" : ""} style="cursor:text"
+                      title=${() => tr("tasks.click_edit")}
+                      @dblclick=${() => (editingCell.value = { id: t.id, field: "title" })}>${t.title}</span>`}
                   </td>
                   <td>${t.dueDate ? html`<span class=${"badge" + " date" + (isOverdue(t.dueDate) ? " overdue" : "")}>${formatDate(t.dueDate)}</span>` : html`<span class="faint">—</span>`}</td>
                   <td>${t.project ? html`<span class="badge project">${"@" + t.project}</span>` : html`<span class="faint">—</span>`}</td>
