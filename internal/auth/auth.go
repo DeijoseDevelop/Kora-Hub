@@ -28,10 +28,23 @@ var (
 )
 
 // Claims son los claims del access token: sub + roles por workspace.
+// Typ separa access de refresh: un refresh jamás pasa por ParseAccess.
 type Claims struct {
 	RolesByWorkspace map[string]string `json:"rbw,omitempty"` // workspaceID -> rol
+	Typ              string            `json:"typ,omitempty"`
 	jwt.RegisteredClaims
 }
+
+// refreshClaims es la forma mínima de un refresh token.
+type refreshClaims struct {
+	Typ string `json:"typ,omitempty"`
+	jwt.RegisteredClaims
+}
+
+const (
+	TypAccess  = "access"
+	TypRefresh = "refresh"
+)
 
 // Service emite y valida tokens.
 type Service struct {
@@ -58,6 +71,7 @@ func CheckPassword(hash, plain string) bool {
 // AccessToken emite un access token con TTL de 15 minutos.
 func (s *Service) AccessToken(userID string, roles map[string]string) (string, error) {
 	return s.sign(Claims{
+		Typ:              TypAccess,
 		RolesByWorkspace: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        ulid.Make().String(), // jti: cada emisión es única
@@ -73,19 +87,22 @@ func (s *Service) AccessToken(userID string, roles map[string]string) (string, e
 // su jti para persistir el hash.
 func (s *Service) RefreshToken(userID string) (string, string, error) {
 	jti := ulid.Make().String()
-	tok, err := s.sign(jwt.RegisteredClaims{
-		ID:        jti,
-		Subject:   userID,
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.refreshTTL)),
+	tok, err := s.sign(refreshClaims{
+		Typ: TypRefresh,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
+			Subject:   userID,
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.refreshTTL)),
+		},
 	})
 	return tok, jti, err
 }
 
-// ParseRefresh valida un refresh token (firma + expiración) y devuelve
-// el userID y el jti para la rotación.
+// ParseRefresh valida un refresh token (firma + expiración + typ) y
+// devuelve el userID y el jti para la rotación.
 func (s *Service) ParseRefresh(raw string) (userID, jti string, err error) {
-	claims := &jwt.RegisteredClaims{}
+	claims := &refreshClaims{}
 	tok, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
@@ -95,10 +112,14 @@ func (s *Service) ParseRefresh(raw string) (userID, jti string, err error) {
 	if err != nil || !tok.Valid {
 		return "", "", fmt.Errorf("%w: %v", ErrInvalidToken, err)
 	}
+	if claims.Typ != TypRefresh {
+		return "", "", fmt.Errorf("%w: no es un refresh token", ErrInvalidToken)
+	}
 	return claims.Subject, claims.ID, nil
 }
 
-// ParseAccess valida un access token y devuelve los claims.
+// ParseAccess valida un access token (firma + expiración + typ) y
+// devuelve los claims. Un refresh token no pasa esta validación.
 func (s *Service) ParseAccess(raw string) (*Claims, error) {
 	claims := &Claims{}
 	tok, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) {
@@ -109,6 +130,9 @@ func (s *Service) ParseAccess(raw string) (*Claims, error) {
 	})
 	if err != nil || !tok.Valid {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+	}
+	if claims.Typ != TypAccess {
+		return nil, fmt.Errorf("%w: no es un access token", ErrInvalidToken)
 	}
 	return claims, nil
 }

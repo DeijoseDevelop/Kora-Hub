@@ -53,7 +53,7 @@ func (s *Server) handleQuickAdd(c *gin.Context) {
 	}
 	// round-trip: la línea persistida es la canónica (fechas relativas
 	// resueltas por el parser)
-	canonical := tasks.RoundTrip(parsed, false, parsed.DueDate, parsed.Project, parsed.Priority, parsed.Assignee)
+	canonical := tasks.RoundTrip(parsed, tasks.StateOpen, parsed.DueDate, parsed.Project, parsed.Priority, parsed.Assignee)
 
 	content, err := s.store.Read(ws.slug, InboxPath)
 	var base string

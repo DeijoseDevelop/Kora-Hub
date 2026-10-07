@@ -57,7 +57,7 @@ type Task struct {
 // Devuelve ok=false si la línea no es un checkbox Markdown.
 func ParseLine(line string) (Task, bool) {
 	trimmed := strings.TrimRight(line, "\r\n ")
-	if !strings.HasPrefix(trimmed, "- [") {
+	if len(trimmed) < 6 || trimmed[0] != '-' {
 		return Task{}, false
 	}
 	state, rest, ok := parseCheckbox(trimmed)
@@ -77,7 +77,12 @@ func ParseLine(line string) (Task, bool) {
 	for _, p := range parts {
 		switch {
 		case strings.HasPrefix(p, "#"):
-			t.DueDate = parseDate(p[1:])
+			if d := parseDate(p[1:]); d != "" {
+				t.DueDate = d
+			} else {
+				// #no-fecha es texto del título (un hashtag), no un slot
+				textParts = append(textParts, p)
+			}
 		case strings.HasPrefix(p, "*every:") && isRecurInterval(p[7:]):
 			t.Recur = p[7:]
 		case strings.HasPrefix(p, "^id:") && isIdentValue(p[4:]):
@@ -119,55 +124,81 @@ func Parse(content string) []Task {
 // preservando al byte el texto que no sea de metadatos. Garantiza que
 // completar/reprogramar/reasignar desde una vista nunca corrompa la
 // redacción original (sección 6.2).
-func RoundTrip(t Task, done bool, due, project, priority, assignee string) string {
-	fields := strings.Fields(t.RawLine)
-	var out []string
-	// conserva el estado original del checkbox (o lo actualiza)
-	head := "- [" + stateOf(t, done) + "]"
-	out = append(out, head)
-	// "- [ ]" se parte en 3 tokens al hacer Fields; se saltan
-	rest := fields
-	if len(rest) >= 3 && rest[0] == "-" && rest[1] == "[" && strings.HasSuffix(rest[2], "]") {
-		rest = rest[3:]
+//
+// state es el nuevo estado del checkbox (StateOpen/StateDone/StateProgress).
+// Un parámetro de metadato vacío conserva el token original; si trae
+// valor se reemplaza la primera aparición válida de ese slot y, si no
+// existía, se añade al final. Los tokens que no son metadatos válidos
+// (p. ej. #regalo o !foo) son texto y se conservan intactos.
+func RoundTrip(t Task, state string, due, project, priority, assignee string) string {
+	_, rest, ok := parseCheckbox(t.RawLine)
+	if !ok {
+		return t.RawLine // no debería pasar: t ya fue parseado
 	}
-	wroteText := false
-	for _, p := range rest {
+	if state != StateOpen && state != StateDone && state != StateProgress {
+		state = stateOf(t, false)
+	}
+	out := []string{"- [" + state + "]"}
+	used := map[string]bool{"due": false, "project": false, "priority": false, "assignee": false}
+	for _, p := range splitMeta(rest) {
 		switch {
-		case strings.HasPrefix(p, "#"):
-			if due != "" {
-				out = append(out, "#"+due)
-			} else {
-				out = append(out, p) // sin cambio: se conserva el token original
-			}
-		case strings.HasPrefix(p, "@"):
-			if project != "" {
-				out = append(out, "@"+project)
+		case strings.HasPrefix(p, "#") && parseDate(p[1:]) != "":
+			if due != "" && !used["due"] {
+				out = append(out, "#"+quoteValue(due))
+				used["due"] = true
 			} else {
 				out = append(out, p)
 			}
-		case strings.HasPrefix(p, "!"):
-			if priority != "" {
-				out = append(out, "!"+priority)
+		case strings.HasPrefix(p, "@") && isIdentValue(p[1:]):
+			if project != "" && !used["project"] {
+				out = append(out, "@"+quoteValue(project))
+				used["project"] = true
 			} else {
 				out = append(out, p)
 			}
-		case strings.HasPrefix(p, "~"):
-			if assignee != "" {
-				out = append(out, "~"+assignee)
+		case strings.HasPrefix(p, "!") && isPriority(unquote(p[1:])):
+			if priority != "" && !used["priority"] {
+				out = append(out, "!"+quoteValue(priority))
+				used["priority"] = true
+			} else {
+				out = append(out, p)
+			}
+		case strings.HasPrefix(p, "~") && isIdentValue(p[1:]):
+			if assignee != "" && !used["assignee"] {
+				out = append(out, "~"+quoteValue(assignee))
+				used["assignee"] = true
 			} else {
 				out = append(out, p)
 			}
 		default:
-			// texto: se vuelve a escribir tal cual, al byte
-			if !wroteText {
-				out = append(out, strings.TrimSpace(p))
-				wroteText = true
-			} else {
-				out = append(out, p)
-			}
+			// texto y metadatos no mutables (^id, ^blocked-by, *every, +tag,
+			// tokens inválidos): se reescriben tal cual, al byte
+			out = append(out, p)
 		}
 	}
+	// slots nuevos: el valor se pidió pero la línea no lo traía
+	if due != "" && !used["due"] {
+		out = append(out, "#"+quoteValue(due))
+	}
+	if project != "" && !used["project"] {
+		out = append(out, "@"+quoteValue(project))
+	}
+	if priority != "" && !used["priority"] {
+		out = append(out, "!"+quoteValue(priority))
+	}
+	if assignee != "" && !used["assignee"] {
+		out = append(out, "~"+quoteValue(assignee))
+	}
 	return strings.Join(out, " ")
+}
+
+// quoteValue envuelve en comillas un valor que no sea un ident plano
+// (§6.5: cualquier valor admite "comillas" para admitir espacios).
+func quoteValue(s string) string {
+	if isIdent(s) {
+		return s
+	}
+	return `"` + s + `"`
 }
 
 func stateOf(t Task, done bool) string {
@@ -180,16 +211,33 @@ func stateOf(t Task, done bool) string {
 	return StateOpen
 }
 
+// StateOf expone el estado de una tarea como constante de checkbox.
+func StateOf(t Task) string {
+	switch {
+	case t.Done:
+		return StateDone
+	case t.InProgress:
+		return StateProgress
+	default:
+		return StateOpen
+	}
+}
+
 func parseCheckbox(line string) (state, rest string, ok bool) {
-	// "- [ ]" | "- [x]" | "- [~]" — exige espacio tras ']'
-	if len(line) < 6 || line[1] != ' ' || line[2] != '[' || line[4] != ']' || line[5] != ' ' {
+	// "- [ ]" | "- [x]" | "- [~]" (tolerante: [X] y tabulador tras '-')
+	if len(line) < 6 || (line[1] != ' ' && line[1] != '\t') || line[2] != '[' || line[4] != ']' {
 		return "", "", false
 	}
 	c := line[3]
 	switch c {
 	case ' ', 'x', '~':
+	case 'X':
+		c = 'x' // estilo GitHub: [X] cuenta como hecha
 	default:
 		return "", "", false
+	}
+	if len(line) < 7 || (line[5] != ' ' && line[5] != '\t') {
+		return "", "", false // exige espacio tras ']' — sin él no es checkbox
 	}
 	rest = strings.TrimSpace(line[5:])
 	if rest == "" {
@@ -350,9 +398,9 @@ func normalizePriority(s string) string {
 	return s
 }
 
-// parseDate resuelve fechas relativas ('hoy', 'mañana', 'lun'..'dom')
-// a AAAA-MM-DD; fechas inválidas devuelven "" sin romper el parseo
-// (regla tolerante, sección 6.2).
+// parseDate resuelve fechas relativas ('hoy', 'mañana', 'lun'..'dom' y
+// sus nombres largos) a AAAA-MM-DD; fechas inválidas devuelven "" sin
+// romper el parseo (regla tolerante, sección 6.2).
 func parseDate(raw string) string {
 	if raw == "" {
 		return ""
@@ -371,6 +419,10 @@ func parseDate(raw string) string {
 		"lun": time.Monday, "mar": time.Tuesday, "mie": time.Wednesday,
 		"jue": time.Thursday, "vie": time.Friday, "sab": time.Saturday,
 		"dom": time.Sunday,
+		// nombres largos: tolerancia de escritura (misma semántica)
+		"lunes": time.Monday, "martes": time.Tuesday, "miércoles": time.Wednesday,
+		"miercoles": time.Wednesday, "jueves": time.Thursday, "viernes": time.Friday,
+		"sábado": time.Saturday, "sabado": time.Saturday, "domingo": time.Sunday,
 	}
 	if wd, ok := dow[strings.ToLower(raw)]; ok {
 		delta := (int(wd) - int(now.Weekday()) + 7) % 7
@@ -379,5 +431,5 @@ func parseDate(raw string) string {
 		}
 		return now.AddDate(0, 0, delta).Format("2006-01-02")
 	}
-	return "" // fecha inválida: warning en la UI, nunca rompe el parseo
+	return "" // fecha inválida: se conserva como texto, nunca rompe el parseo
 }

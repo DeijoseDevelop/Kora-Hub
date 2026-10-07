@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 )
 
 const getDocByID = `-- name: GetDocByID :one
@@ -75,9 +74,7 @@ func (q *Queries) GetDocByPath(ctx context.Context, arg GetDocByPathParams) (Get
 }
 
 const getTaskByID = `-- name: GetTaskByID :one
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project,
-       priority, assignee, done, created_at, updated_at
-FROM tasks
+SELECT id, workspace_id, doc_id, line_no, title, due_date, project, priority, assignee, done, created_at, updated_at, in_progress, task_uid, recur, blocked_by FROM tasks
 WHERE id = ? AND workspace_id = ?
 `
 
@@ -86,24 +83,9 @@ type GetTaskByIDParams struct {
 	WorkspaceID string `json:"workspace_id"`
 }
 
-type GetTaskByIDRow struct {
-	ID          string         `json:"id"`
-	WorkspaceID string         `json:"workspace_id"`
-	DocID       string         `json:"doc_id"`
-	LineNo      int64          `json:"line_no"`
-	Title       string         `json:"title"`
-	DueDate     sql.NullString `json:"due_date"`
-	Project     sql.NullString `json:"project"`
-	Priority    sql.NullString `json:"priority"`
-	Assignee    sql.NullString `json:"assignee"`
-	Done        int64          `json:"done"`
-	CreatedAt   string         `json:"created_at"`
-	UpdatedAt   string         `json:"updated_at"`
-}
-
-func (q *Queries) GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error) {
+func (q *Queries) GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error) {
 	row := q.db.QueryRowContext(ctx, getTaskByID, arg.ID, arg.WorkspaceID)
-	var i GetTaskByIDRow
+	var i Task
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
@@ -117,6 +99,10 @@ func (q *Queries) GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTa
 		&i.Done,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.InProgress,
+		&i.TaskUid,
+		&i.Recur,
+		&i.BlockedBy,
 	)
 	return i, err
 }

@@ -26,7 +26,7 @@ This document describes the technical architecture of Kora Hub. It is a public, 
                            │ HTTPS / REST (JSON)
 ┌──────────────────────────▼────────────────────┐
 │ GO BINARY — one process                       │
-│ HTTP (Gin) · JWT · task parser · FTS5 · webhooks│
+│ HTTP (Gin) · JWT · task parser · FTS5           │
 │ ├─ SQLite (modernc.org/sqlite) — index & cache │
 │ ├─ Markdown store — canonical files (disk/S3)  │
 │ └─ Attachments — S3 interface (local/R2/MinIO) │

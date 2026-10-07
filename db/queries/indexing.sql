@@ -26,7 +26,5 @@ ON CONFLICT(workspace_id, path) DO UPDATE SET
 RETURNING id;
 
 -- name: GetTaskByID :one
-SELECT id, workspace_id, doc_id, line_no, title, due_date, project,
-       priority, assignee, done, created_at, updated_at
-FROM tasks
+SELECT * FROM tasks
 WHERE id = ? AND workspace_id = ?;

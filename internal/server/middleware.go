@@ -20,7 +20,23 @@ func rateLimit(limit int, window time.Duration, key func(*gin.Context) string) g
 		k := key(c)
 		now := time.Now()
 		mu.Lock()
-		// purga entradas fuera de la ventana
+		// purga entradas fuera de la ventana (y las de otras claves si el
+		// mapa crece: sin esto, rotar X-Forwarded-For / IPs agota memoria)
+		if len(hits) > 4096 {
+			for kk, vv := range hits {
+				kept := vv[:0]
+				for _, t := range vv {
+					if now.Sub(t) < window {
+						kept = append(kept, t)
+					}
+				}
+				if len(kept) == 0 {
+					delete(hits, kk)
+				} else {
+					hits[kk] = kept
+				}
+			}
+		}
 		kept := hits[k][:0]
 		for _, t := range hits[k] {
 			if now.Sub(t) < window {
@@ -42,6 +58,17 @@ func rateLimit(limit int, window time.Duration, key func(*gin.Context) string) g
 }
 
 func clientIP(c *gin.Context) string { return c.ClientIP() }
+
+// limitBody acota el cuerpo de las peticiones JSON (presupuesto P5:
+// <100 MB RAM por instancia — un body ilimitado es OOM garantizado).
+func limitBody(max int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Body != nil {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, max)
+		}
+		c.Next()
+	}
+}
 
 func userKey(c *gin.Context) string {
 	if uid := c.GetString("user_id"); uid != "" {

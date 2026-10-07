@@ -291,7 +291,7 @@ func (h *Handler) toolQuickAddTask(ctx context.Context, ws Workspace, args map[s
 	if !ok {
 		return errResult("no se pudo interpretar la tarea")
 	}
-	canonical := tasks.RoundTrip(parsed, false, parsed.DueDate, parsed.Project, parsed.Priority, parsed.Assignee)
+	canonical := tasks.RoundTrip(parsed, tasks.StateOpen, parsed.DueDate, parsed.Project, parsed.Priority, parsed.Assignee)
 
 	const inboxPath = "inbox.md"
 	content, _ := h.deps.Store.Read(ws.Slug, inboxPath)
@@ -340,7 +340,11 @@ func (h *Handler) toolSetTaskDone(ctx context.Context, ws Workspace, args map[st
 	if !ok {
 		return errResult("la linea ya no es una tarea valida")
 	}
-	lines[idx] = tasks.RoundTrip(parsed, done, parsed.DueDate, parsed.Project, parsed.Priority, parsed.Assignee)
+	state := tasks.StateOpen
+	if done {
+		state = tasks.StateDone
+	}
+	lines[idx] = tasks.RoundTrip(parsed, state, parsed.DueDate, parsed.Project, parsed.Priority, parsed.Assignee)
 	// recurrencia (§6.5): al completar se inserta la siguiente ocurrencia
 	if done && parsed.Recur != "" && parsed.DueDate != "" {
 		if next := tasks.NextOccurrence(parsed.DueDate, parsed.Recur); next != "" {

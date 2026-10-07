@@ -8,19 +8,114 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 
 ### Added
 
-- **Share-links públicos de documentos** (decisión D5): `GET/POST/DELETE
-  /docs/:id/share` (editor+) y `GET /public/docs/:token` sin sesión — el
-  token ULID es la capacidad, sirve el Markdown canónico del filesystem
-  y se revoca al regenerar o con DELETE. Frontend: botón Compartir en el
-  editor (copiar/regenerar/revocar) y vista pública `#/p/:token`
-  read-only con render Markdown y cabecera/pie propios.
-- **Load test k6 en CI** (`scripts/loadtest.js` + job `loadtest`):
-  25 VUs de tráfico mezclado sobre el binario real y chequeo del
-  presupuesto P5 leyendo `VmHWM` del proceso — falla si el pico supera
-  100 MB.
-- **E2E Playwright** (`e2e/` + job `e2e` en CI) sobre el binario real:
-  register → doc con tarea → kanban → quick-add offline con replay al
-  reconectar → share-link público sin sesión.
+- **Búsqueda full-text local-first** (`/search`): resultados del mirror
+  Dexie al instante + refuerzo FTS5 del servidor cuando hay red, filtro
+  `todos|doc|tarea`, snippets con contexto. Antes era un stub.
+- **Sanitizador HTML por allowlist** (`web/src/ui/sanitize.ts`): preview
+  del editor y página pública `#/p/:token` ya no ejecutan HTML activo
+  del Markdown del usuario (XSS persistente → robo de sesión en el
+  share-link). 9 tests vitest.
+- **Kanban por columna semántico**: drop en Todo→`[ ]`, Doing→`[~]`,
+  Done→`[x]` (antes cualquier drop hacía toggle de done).
+- **`PATCH /tasks/:id` con `state`** (`open|done|progress`) y flags
+  `done`/`in_progress` como punteros — un PATCH de solo proyecto ya no
+  des-completa la tarea.
+- **`SetTaskState`** (sqlc): fija `done` + `in_progress` en una sola
+  query.
+- **Tests de regresión E2E Playwright ampliados** (11 specs): round-trip
+  de tareas `[x]`/`[~]`, kanban por columna, XSS, búsqueda, command
+  palette con teclado, path traversal, token typ, FTS con comillas,
+  i18n.
+
+### Fixed
+
+- **Round-trip del parser corrompía tareas `[x]`/`[~]`** (Go y TS):
+  `strings.Fields`/`split(3)` trataba el checkbox como 3 tokens y
+  reescribía la línea duplicando el checkbox o borrando el título.
+  Cualquier PATCH sobre una tarea hecha/en progreso corrompía el
+  Markdown canónico. RoundTrip ahora extrae `rest` vía `parseCheckbox`
+  + `splitMeta`, reemplaza solo el primer slot válido de cada tipo y
+  re-cita valores con espacios.
+- **Parser TS↔Go divergente**: TS aceptaba `[X]`/tabs y Go no (y
+  viceversa con `#lun` vs `#lunes`); TS conservaba `#no-fecha` como
+  texto y Go lo descartaba. Ahora ambos aceptan `[X]`, tabulador tras
+  `-`, abreviaturas y nombres largos de día, y `#no-fecha` es texto.
+- **Fechas relativas en UTC** (`toISOString`): `#hoy`/`#mañana` daban el
+  día equivocado entre 00:00–02:00 locales. Ahora componentes locales en
+  parser TS y `kit.ts`.
+- **XSS persistente en Markdown** (preview + share público): `marked`
+  no sanitiza y el resultado iba a `innerHTML`. Ahora `sanitizeHTML`
+  por allowlist sobre el DOM.
+- **Path traversal por slug de workspace**: `../evil` como slug
+  escribía/borraba fuera de `data/workspaces/`. `docs.ValidSlug` +
+  `safeSeg` en `store.resolve` + validación en `POST /workspaces`.
+- **Refresh token aceptado como access token**: `ParseAccess` no
+  distinguía `typ` — un refresh filtrado daba 30 días de acceso. Claim
+  `typ: access|refresh` verificado en ambos parsers.
+- **Pull perdía cambios al truncar por `limit`**: el cursor devuelto era
+  `lastSeq` (máximo global), no el seq de la última fila entregada. Con
+  500 cambios de golpe la pérdida era masiva. Ahora el cursor es el seq
+  de la última fila; si un snapshot falla el cursor no avanza.
+- **LWW se bypaseaba sin `updated_at`**: el push siempre ganaba sin
+  preservar la versión perdedora. Ahora se normaliza el reloj y
+  **siempre** se snapshota el contenido anterior antes de sobrescribir.
+- **`doc.delete` no idempotente**: un replay dejaba el batch clavado en
+  409 para siempre. `DeleteDoc` devuelve nil si el doc ya no existe.
+- **`DELETE /workspaces` fallaba con 500** si había tareas, versiones,
+  shares o adjuntos (FK sin `ON DELETE CASCADE`). Orden FK-safe con
+  limpieza de `doc_shares`, `doc_versions`, `backlinks`, `docs_fts`,
+  `saved_views`, `webhooks`, `audit_log`.
+- **IDs de tarea inestables**: `rebuildTasks` hacía `DeleteTasksForDoc` +
+  `UpsertTask` con ULID nuevo en cada reindex — el `PATCH /tasks/:id`
+  devolvía un id que ya no existía. Ahora upsert por `(doc_id, line_no)`
+  conserva el id y solo se purgan líneas que ya no son tareas.
+- **Reindex recreaba docs borrados con id inconsistente**: el ULID nuevo
+  ignoraba el `RETURNING id` del upsert (la fila conservaba el viejo) y
+  las tareas insertadas apuntaban a un doc inexistente. Ahora se usa el
+  id devuelto por `UpsertDoc`.
+- **Reindex no purgaba docs huérfanos**: un doc borrado a mano sobrevivía
+  en el índice indefinidamente. `purgeMissingDocs` lo elimina + limpia
+  versiones/shares/backlinks.
+- **`applyChanges` cruzaba workspaces por `path`**: un pull de WS-A
+  machacaba el inbox de WS-B (el match por path no filtraba workspace).
+  Ahora `filter(workspaceId + deleted !== 1)`. Igual en `quickAddLocal`.
+- **Kanban drop marcaba done al soltar en "En curso"**: el `@drop`
+  ignoraba la columna destino. Ahora semántica por columna.
+- **Command palette: flechas no movían el highlight**: `selected` era un
+  campo plano (no signal) y Nix.js no re-evalúa `class` dentro de un
+  `.map()` anidado. Ahora `selected = signal(0)` + `paintSelection()`
+  que pinta el highlight a mano + foco automático en el input + manejo
+  de flechas en el window keydown (el foco puede no estar en el input).
+- **`pushPending` reentrante perdía el reintento**: un comando encolado
+  durante un push en vuelo quedaba huérfano. Ahora flag `dirty` que
+  relanza al terminar. `focus` ahora también hace push (antes solo pull).
+- **`clearQueue()` en 403 borraba comandos encolados durante el push**:
+  ahora solo se descartan los de ese push (`bulkDelete` por id).
+- **Rate-limit bypaseable por `X-Forwarded-For`**: Gin confiaba en todos
+  los proxies. `SetTrustedProxies(nil)` + purga del mapa de hits >4096.
+- **FTS5 revienta con comillas/operadores**: `MATCH ?` con query crudo
+  daba 500. Ahora `escapeFTS` (literal entre comillas).
+- **Sin límite de cuerpo ni timeouts HTTP**: `limitBody(8MB)` +
+  `ReadTimeout/WriteTimeout/IdleTimeout` en `http.Server`.
+- **`handlePatchTask` reescribía la línea equivocada** si el archivo
+  cambió desde el índice: ahora `resolveTaskLine` re-resuelve por `^id:`
+  y por título antes de mutar.
+- **`handleLogin` enmascaraba errores de BD como credenciales inválidas**
+  (la rama 500 era inalcanzable).
+- **README/docs prometían webhooks** que están en P3: se ajustó el texto
+  a "webhooks on the roadmap".
+
+### Changed
+
+- `RoundTrip(t, done, ...)` → `RoundTrip(t, state, ...)` con constantes
+  `StateOpen|StateDone|StateProgress` (Go) y `TaskState` (TS).
+- `applyTaskState(content, task, done)` → `applyTaskState(content, task, state)`.
+- `patchTaskRequest.Done` es ahora `*bool` (distingue ausente de false).
+- Nueva función `setTaskStateLocal` en el data layer (kanban por columna).
+- `syncStatus()` sigue como stub pero `pushPending` notifica `dirty`.
+- Nuevas claves i18n: `search.*` (ph, all, docs, tasks, empty, searching),
+  `sync.rejected`, `app.nav.search`.
+- `docs/ARCHITECTURE.md`: se quitó "webhooks" del diagrama (P3).
 
 ### Fixed
 

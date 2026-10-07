@@ -57,7 +57,7 @@ type Querier interface {
 	GetPublicDocByToken(ctx context.Context, token string) (GetPublicDocByTokenRow, error)
 	GetRefreshTokenByID(ctx context.Context, id string) (RefreshToken, error)
 	GetSavedView(ctx context.Context, arg GetSavedViewParams) (SavedView, error)
-	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (GetTaskByIDRow, error)
+	GetTaskByID(ctx context.Context, arg GetTaskByIDParams) (Task, error)
 	GetTaskByUID(ctx context.Context, arg GetTaskByUIDParams) (Task, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
@@ -96,6 +96,7 @@ type Querier interface {
 	SearchTasksByTitle(ctx context.Context, arg SearchTasksByTitleParams) ([]Task, error)
 	SetDocUpdatedAt(ctx context.Context, arg SetDocUpdatedAtParams) error
 	SetTaskDone(ctx context.Context, arg SetTaskDoneParams) error
+	SetTaskState(ctx context.Context, arg SetTaskStateParams) error
 	SoftDeleteDoc(ctx context.Context, arg SoftDeleteDocParams) error
 	UpdateDocContent(ctx context.Context, arg UpdateDocContentParams) error
 	UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) error

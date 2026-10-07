@@ -5,6 +5,7 @@ import { marked } from "marked";
 import { router } from "../../router";
 import { publicDocsApi, type PublicDoc } from "../../api/client";
 import { escapeHtml } from "../../ui/kit";
+import { sanitizeHTML } from "../../ui/sanitize";
 import { t } from "../../i18n";
 
 // PublicDocPage es la vista pública read-only de un share-link (D5):
@@ -40,7 +41,7 @@ export class PublicDocPage extends NixComponent {
     const el = this.bodyRef.el;
     if (!el) return;
     try {
-      el.innerHTML = marked.parse(md, { breaks: true, gfm: true }) as string;
+      el.innerHTML = sanitizeHTML(marked.parse(md, { breaks: true, gfm: true }) as string);
     } catch {
       el.innerHTML = `<pre>${escapeHtml(md)}</pre>`;
     }

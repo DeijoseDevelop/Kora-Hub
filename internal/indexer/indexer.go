@@ -35,7 +35,8 @@ func New(store *docs.Store, queries *db.Queries, conn *sql.DB, logger *slog.Logg
 
 // ReindexWorkspace recorre todos los archivos del workspace y regenera
 // el índice. Incremental: solo se reparsean archivos cuyo content_hash
-// cambió (sección 6.2).
+// cambió (sección 6.2). Además purga del índice los docs cuyo archivo
+// desapareció del filesystem (P1: borrar la DB es seguro).
 func (ix *Indexer) ReindexWorkspace(ctx context.Context, workspaceID, slug string) (int, error) {
 	ws, err := ix.queries.GetWorkspaceByID(ctx, workspaceID)
 	if err != nil {
@@ -49,7 +50,9 @@ func (ix *Indexer) ReindexWorkspace(ctx context.Context, workspaceID, slug strin
 	}
 
 	indexed := 0
+	live := make(map[string]bool, len(files))
 	for _, rel := range files {
+		live[rel] = true
 		changed, err := ix.reindexFile(ctx, workspaceID, slug, rel, ownerID)
 		if err != nil {
 			ix.logger.Warn("reindexar archivo", "path", rel, "err", err)
@@ -59,7 +62,27 @@ func (ix *Indexer) ReindexWorkspace(ctx context.Context, workspaceID, slug strin
 			indexed++
 		}
 	}
+	if err := ix.purgeMissingDocs(ctx, workspaceID, slug, live); err != nil {
+		ix.logger.Warn("purgar docs ausentes", "err", err)
+	}
 	return indexed, nil
+}
+
+// purgeMissingDocs elimina del índice los docs cuyo archivo ya no existe.
+func (ix *Indexer) purgeMissingDocs(ctx context.Context, workspaceID, slug string, live map[string]bool) error {
+	rows, err := ix.queries.ListDocsByWorkspace(ctx, workspaceID)
+	if err != nil {
+		return err
+	}
+	for _, d := range rows {
+		if live[d.Path] {
+			continue
+		}
+		if err := ix.DeleteDoc(ctx, workspaceID, slug, d.ID); err != nil {
+			ix.logger.Warn("purge doc", "path", d.Path, "err", err)
+		}
+	}
+	return nil
 }
 
 // reindexFile indexa un único documento si su contenido cambió.
@@ -83,16 +106,21 @@ func (ix *Indexer) reindexFile(ctx context.Context, workspaceID, slug, rel, owne
 		docID = ulid.Make().String()
 	}
 	title := deriveTitle(rel, content)
-	if _, err := ix.queries.UpsertDoc(ctx, db.UpsertDocParams{
+	// el id devuelto por UpsertDoc es la verdad: si la fila ya existía
+	// (p. ej. un doc borrado y recreado con el mismo path) conserva su
+	// id original y el change_log/tareas deben referenciar ese
+	upsertedID, err := ix.queries.UpsertDoc(ctx, db.UpsertDocParams{
 		ID:          docID,
 		WorkspaceID: workspaceID,
 		Path:        rel,
 		Title:       title,
 		ContentHash: hash,
 		CreatedBy:   ownerID, // el autor real se resuelve por membresía en sync
-	}); err != nil {
+	})
+	if err != nil {
 		return false, err
 	}
+	docID = upsertedID
 
 	// el cambio queda registrado para el sync delta (sección 9.1)
 	if _, err := ix.queries.InsertChange(ctx, db.InsertChangeParams{
@@ -117,17 +145,19 @@ func (ix *Indexer) reindexFile(ctx context.Context, workspaceID, slug, rel, owne
 }
 
 // rebuildTasks reemplaza las tareas del documento en el índice
-// (clave: doc_id + line_no; idempotente por diseño).
+// (clave: doc_id + line_no; idempotente por diseño). Conserva el id de
+// cada fila cuando la línea sigue existiendo — un PATCH de tarea no
+// puede devolver un id que el reindex acaba de regenerar.
 func (ix *Indexer) rebuildTasks(ctx context.Context, workspaceID, docID, rel string, content []byte) error {
-	if err := ix.queries.DeleteTasksForDoc(ctx, docID); err != nil {
-		return err
-	}
-	for _, t := range tasks.Parse(string(content)) {
+	parsed := tasks.Parse(string(content))
+	seen := make([]int64, 0, len(parsed))
+	for _, t := range parsed {
 		// el project por defecto es la carpeta del documento
 		project := t.Project
 		if project == "" {
 			project = defaultProject(rel)
 		}
+		seen = append(seen, int64(t.Line))
 		if err := ix.queries.UpsertTask(ctx, db.UpsertTaskParams{
 			ID:          ulid.Make().String(),
 			WorkspaceID: workspaceID,
@@ -147,7 +177,30 @@ func (ix *Indexer) rebuildTasks(ctx context.Context, workspaceID, docID, rel str
 			return err
 		}
 	}
+	// purga de líneas que ya no son tareas (sin esto, borrar una línea
+	// dejaba la tarea huérfana en el índice)
+	if err := ix.purgeStaleTasks(ctx, docID, seen); err != nil {
+		return err
+	}
 	return nil
+}
+
+// purgeStaleTasks elimina tareas cuyo line_no ya no existe en el doc.
+func (ix *Indexer) purgeStaleTasks(ctx context.Context, docID string, keep []int64) error {
+	if len(keep) == 0 {
+		_, err := ix.conn.ExecContext(ctx, `DELETE FROM tasks WHERE doc_id = ?`, docID)
+		return err
+	}
+	placeholders := strings.Repeat("?,", len(keep))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]any, 0, len(keep)+1)
+	args = append(args, docID)
+	for _, n := range keep {
+		args = append(args, n)
+	}
+	_, err := ix.conn.ExecContext(ctx,
+		`DELETE FROM tasks WHERE doc_id = ? AND line_no NOT IN (`+placeholders+`)`, args...)
+	return err
 }
 
 func (ix *Indexer) rebuildBacklinks(ctx context.Context, docID string, content []byte) error {
@@ -192,6 +245,11 @@ func (ix *Indexer) rebuildFTS(ctx context.Context, docID, title string, content 
 func (ix *Indexer) DeleteDoc(ctx context.Context, workspaceID, slug, docID string) error {
 	doc, err := ix.queries.GetDocByID(ctx, db.GetDocByIDParams{ID: docID, WorkspaceID: workspaceID})
 	if err != nil {
+		// idempotente: un delete repetido (o de un doc ya purgado) no es
+		// un error — el replay de la cola offline no debe clavarse
+		if err == sql.ErrNoRows {
+			return nil
+		}
 		return err
 	}
 	if err := ix.store.Delete(slug, doc.Path); err != nil && !os.IsNotExist(err) {
@@ -203,6 +261,9 @@ func (ix *Indexer) DeleteDoc(ctx context.Context, workspaceID, slug, docID strin
 	for _, stmt := range []string{
 		`DELETE FROM docs_fts WHERE doc_id = ?`,
 		`DELETE FROM backlinks WHERE src_doc_id = ?`,
+		`DELETE FROM backlinks WHERE dst_doc_id = ?`,
+		`DELETE FROM doc_versions WHERE doc_id = ?`,
+		`DELETE FROM doc_shares WHERE doc_id = ?`,
 	} {
 		if _, err := ix.conn.ExecContext(ctx, stmt, docID); err != nil {
 			return err

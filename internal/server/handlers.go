@@ -13,6 +13,7 @@ import (
 
 	"github.com/DeijoseDevelop/Kora-Hub/internal/auth"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/search"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/tasks"
 	"github.com/gin-gonic/gin"
@@ -198,6 +199,12 @@ func (s *Server) handleCreateWorkspace(c *gin.Context) {
 	var req workspaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.fail(c, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	// el slug se usa como directorio del filesystem canónico: sin
+	// traversal (ValidSlug excluye '.', '..', '/', '\')
+	if !docs.ValidSlug(req.Slug) {
+		s.fail(c, http.StatusBadRequest, "bad_slug", "el slug solo admite a-z, 0-9 y guiones")
 		return
 	}
 	id := ulid.Make().String()
@@ -619,11 +626,46 @@ func (s *Server) handleListTasks(c *gin.Context) {
 }
 
 type patchTaskRequest struct {
-	Done     bool   `json:"done"`
-	DueDate  string `json:"due_date,omitempty"`
-	Project  string `json:"project,omitempty"`
-	Priority string `json:"priority,omitempty"`
-	Assignee string `json:"assignee,omitempty"`
+	// Done/InProgress son punteros para distinguir "sin cambio" de false
+	// (antes un PATCH de solo proyecto des-completaba la tarea).
+	Done       *bool  `json:"done,omitempty"`
+	InProgress *bool  `json:"in_progress,omitempty"`
+	State      string `json:"state,omitempty"` // open | done | progress
+	DueDate    string `json:"due_date,omitempty"`
+	Project    string `json:"project,omitempty"`
+	Priority   string `json:"priority,omitempty"`
+	Assignee   string `json:"assignee,omitempty"`
+}
+
+// taskState resuelve el estado nuevo del checkbox a partir de la
+// petición (state explícito, o flags done/in_progress).
+func (r patchTaskRequest) taskState(cur tasks.Task) string {
+	if r.State != "" {
+		switch r.State {
+		case "done":
+			return tasks.StateDone
+		case "progress":
+			return tasks.StateProgress
+		case "open":
+			return tasks.StateOpen
+		}
+	}
+	state := tasks.StateOf(cur)
+	if r.Done != nil {
+		if *r.Done {
+			state = tasks.StateDone
+		} else if state == tasks.StateDone {
+			state = tasks.StateOpen
+		}
+	}
+	if r.InProgress != nil {
+		if *r.InProgress {
+			state = tasks.StateProgress
+		} else if state == tasks.StateProgress && state != tasks.StateDone {
+			state = tasks.StateOpen
+		}
+	}
+	return state
 }
 
 func (s *Server) handlePatchTask(c *gin.Context) {
@@ -661,30 +703,24 @@ func (s *Server) handlePatchTask(c *gin.Context) {
 
 	lines := strings.Split(string(content), "\n")
 	idx := int(task.LineNo) - 1
-	if idx < 0 || idx >= len(lines) {
-		s.fail(c, http.StatusConflict, "line_missing", "la línea fuente ya no existe")
+	// la línea del índice puede haberse desplazado: se re-resuelve por
+	// ^id: y, en su defecto, por título antes de mutar nada
+	parsed, ok := s.resolveTaskLine(lines, idx, task)
+	if !ok {
+		s.fail(c, http.StatusConflict, "line_missing", "la línea fuente ya no corresponde a la tarea")
 		return
 	}
+	idx = parsed.Line - 1
 
-	// round-trip: reescribir solo la línea original, preservando el resto
-	parsed, ok := tasks.ParseLine(lines[idx])
-	if ok {
-		lines[idx] = tasks.RoundTrip(parsed, req.Done,
-			req.DueDate, req.Project, req.Priority, req.Assignee)
-		// recurrencia (§6.5): al completar, la siguiente ocurrencia se
-		// inserta como línea nueva debajo — nunca se reabre la misma
-		if req.Done && parsed.Recur != "" && parsed.DueDate != "" {
-			if next := tasks.NextOccurrence(parsed.DueDate, parsed.Recur); next != "" {
-				lines = slices.Insert(lines, idx+1, tasks.SpawnRecurring(parsed.RawLine, next))
-			}
+	state := req.taskState(parsed)
+	lines[idx] = tasks.RoundTrip(parsed, state,
+		req.DueDate, req.Project, req.Priority, req.Assignee)
+	// recurrencia (§6.5): al completar, la siguiente ocurrencia se
+	// inserta como línea nueva debajo — nunca se reabre la misma
+	if state == tasks.StateDone && parsed.Recur != "" && parsed.DueDate != "" {
+		if next := tasks.NextOccurrence(parsed.DueDate, parsed.Recur); next != "" {
+			lines = slices.Insert(lines, idx+1, tasks.SpawnRecurring(parsed.RawLine, next))
 		}
-	} else {
-		// drift: reconstruir la línea mínima sin perder el título
-		state := " "
-		if req.Done {
-			state = "x"
-		}
-		lines[idx] = "- [" + state + "] " + task.Title
 	}
 
 	if err := s.store.Write(ws.slug, doc.Path, []byte(strings.Join(lines, "\n"))); err != nil {
@@ -695,19 +731,59 @@ func (s *Server) handlePatchTask(c *gin.Context) {
 		s.logger.Warn("reindex tras PATCH task", "err", err)
 	}
 
-	done := task.Done
-	if req.Done {
+	done := int64(0)
+	if state == tasks.StateDone {
 		done = 1
-	} else if !req.Done && task.Done == 1 {
-		done = 0
 	}
-	if err := s.queries.SetTaskDone(c, db.SetTaskDoneParams{
-		Done: done, ID: task.ID, WorkspaceID: ws.id,
+	inProgress := int64(0)
+	if state == tasks.StateProgress {
+		inProgress = 1
+	}
+	if err := s.queries.SetTaskState(c, db.SetTaskStateParams{
+		Done: done, InProgress: inProgress, ID: task.ID, WorkspaceID: ws.id,
 	}); err != nil {
 		s.fail(c, http.StatusInternalServerError, "internal", "no se pudo actualizar la tarea")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": task.ID, "done": done == 1})
+	c.JSON(http.StatusOK, gin.H{"id": task.ID, "done": done == 1, "state": state})
+}
+
+// resolveTaskLine localiza la línea actual de una tarea: primero en el
+// line_no del índice y, si el contenido ya no coincide, re-resuelve por
+// ^id: y por título en todo el documento. Evita reescribir la línea
+// equivocada cuando el archivo se editó desde el índice.
+func (s *Server) resolveTaskLine(lines []string, idx int, task db.Task) (tasks.Task, bool) {
+		if idx >= 0 && idx < len(lines) {
+		if parsed, ok := tasks.ParseLine(lines[idx]); ok {
+			if parsed.TaskUID != "" && parsed.TaskUID == task.TaskUid {
+				parsed.Line = idx + 1
+				return parsed, true
+			}
+			if parsed.Text == task.Title {
+				parsed.Line = idx + 1
+				return parsed, true
+			}
+		}
+	}
+	// re-resolución: ^id: primero (identidad estable), luego título
+	for i, line := range lines {
+		parsed, ok := tasks.ParseLine(line)
+		if !ok {
+			continue
+		}
+		if task.TaskUid != "" && parsed.TaskUID == task.TaskUid {
+			parsed.Line = i + 1
+			return parsed, true
+		}
+	}
+	for i, line := range lines {
+		parsed, ok := tasks.ParseLine(line)
+		if ok && parsed.Text == task.Title {
+			parsed.Line = i + 1
+			return parsed, true
+		}
+	}
+	return tasks.Task{}, false
 }
 
 // ------------------------------- Search --------------------------------

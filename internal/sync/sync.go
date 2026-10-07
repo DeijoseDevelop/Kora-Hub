@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/docs"
@@ -81,20 +82,21 @@ func (e *Engine) Pull(ctx context.Context, workspaceID string, since int64, limi
 	}
 
 	out := make([]Change, 0, len(rows))
+	cursor := since
 	for _, r := range rows {
 		ch := Change{Seq: r.Seq, Entity: r.Entity, EntityID: r.EntityID, Op: r.Op, CreatedAt: r.CreatedAt}
 		if r.Entity == "doc" {
 			snap, err := e.docSnapshot(ctx, workspaceID, r.EntityID, r.Op == "delete")
-			if err == nil {
-				ch.Doc = snap
+			if err != nil {
+				// sin snapshot el cliente no puede aplicar el cambio: se
+				// corta aquí y el cursor NO avanza — el pull se repetirá
+				// desde este punto y no se pierde nada
+				return &PullResult{Cursor: cursor, Changes: out}, nil
 			}
+			ch.Doc = snap
 		}
 		out = append(out, ch)
-	}
-
-	cursor, err := e.lastSeq(ctx, workspaceID)
-	if err != nil {
-		return nil, err
+		cursor = r.Seq
 	}
 	return &PullResult{Cursor: cursor, Changes: out}, nil
 }
@@ -158,26 +160,32 @@ func (e *Engine) applyDocUpsert(ctx context.Context, wsID, wsSlug string, cmd Pu
 	if !strings.HasSuffix(strings.ToLower(cmd.Path), ".md") {
 		cmd.Path += ".md"
 	}
+	// reloj del cliente normalizado: sin updated_at el comando se marca
+	// con la hora actual (gana) — pero SIEMPRE se preserva la versión
+	// perdedora cuando el contenido cambia (§9: nunca destructivo)
+	if cmd.UpdatedAt == "" {
+		cmd.UpdatedAt = time.Now().UTC().Format("2006-01-02 15:04:05")
+	}
 
 	existing, err := e.queries.GetDocByPath(ctx, db.GetDocByPathParams{WorkspaceID: wsID, Path: cmd.Path})
-	if err == nil && cmd.UpdatedAt != "" && existing.UpdatedAt > cmd.UpdatedAt {
+	if err == nil && existing.UpdatedAt > cmd.UpdatedAt {
 		// LWW: el servidor gana; la versión perdedora se conserva como
 		// snapshot en .versions/ (recuperable, nunca destructivo).
-		ws, err := e.queries.GetWorkspaceByID(ctx, wsID)
-		if err != nil {
-			return err
-		}
-		hash := docs.ContentHash([]byte(cmd.Content))
-		vpath, err := e.store.WriteVersion(ws.Slug, existing.ID, ulid.Make().String(), []byte(cmd.Content))
-		if err != nil {
-			return err
-		}
-		if err := e.queries.InsertDocVersion(ctx, db.InsertDocVersionParams{
-			DocID: existing.ID, ContentHash: hash, CreatedBy: ws.OwnerID, StoragePath: vpath,
-		}); err != nil {
+		if err := e.saveLosingVersion(ctx, wsID, existing.ID, cmd.Content); err != nil {
 			return err
 		}
 		return nil
+	}
+
+	// el contenido actual del servidor se preserva antes de sobrescribir
+	if err == nil {
+		if cur, rerr := e.store.Read(wsSlug, cmd.Path); rerr == nil {
+			if docs.ContentHash(cur) != docs.ContentHash([]byte(cmd.Content)) {
+				if err := e.saveLosingVersion(ctx, wsID, existing.ID, string(cur)); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	if err := e.store.Write(wsSlug, cmd.Path, []byte(cmd.Content)); err != nil {
@@ -189,14 +197,26 @@ func (e *Engine) applyDocUpsert(ctx context.Context, wsID, wsSlug string, cmd Pu
 	// LWW coherente: el reloj del cliente manda. Sin esto, una cola de
 	// comandos offline aplicada al reconectar haría que el último cambio
 	// se rechazara (el servidor usaba su propio tiempo de aplicación).
-	if cmd.UpdatedAt != "" {
-		if err := e.queries.SetDocUpdatedAt(ctx, db.SetDocUpdatedAtParams{
-			UpdatedAt: cmd.UpdatedAt, WorkspaceID: wsID, Path: cmd.Path,
-		}); err != nil {
-			return err
-		}
+	return e.queries.SetDocUpdatedAt(ctx, db.SetDocUpdatedAtParams{
+		UpdatedAt: cmd.UpdatedAt, WorkspaceID: wsID, Path: cmd.Path,
+	})
+}
+
+// saveLosingVersion preserva una versión perdedora como snapshot en
+// .versions/ + fila en doc_versions (§9: nunca destructivo).
+func (e *Engine) saveLosingVersion(ctx context.Context, wsID, docID, content string) error {
+	ws, err := e.queries.GetWorkspaceByID(ctx, wsID)
+	if err != nil {
+		return err
 	}
-	return nil
+	hash := docs.ContentHash([]byte(content))
+	vpath, err := e.store.WriteVersion(ws.Slug, docID, ulid.Make().String(), []byte(content))
+	if err != nil {
+		return err
+	}
+	return e.queries.InsertDocVersion(ctx, db.InsertDocVersionParams{
+		DocID: docID, ContentHash: hash, CreatedBy: ws.OwnerID, StoragePath: vpath,
+	})
 }
 
 // lastSeq devuelve el cursor actual del workspace (0 si no hay cambios).

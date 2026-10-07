@@ -1,60 +1,76 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
 import { applyChanges, getCursor, mirrorDoc, type Change } from "./local";
-import { enqueue, clearQueue, queueDB, type QueuedCommand } from "./queue";
+import { enqueue, queueDB, type QueuedCommand } from "./queue";
 import { apiFetch, getToken } from "../api/client";
 import { activeWs } from "../data/workspace";
 import { showToast } from "../ui/kit";
+import { t } from "../i18n";
 
 // Cliente del sync delta (sección 9): push de la cola offline + pull
 // del delta por cursor. Replays con idempotency-key se deduplican en
 // el servidor.
 
 let inFlight = false;
+let dirty = false;
 
 export function syncStatus(): { online: boolean; pending: number } {
   return { online: navigator.onLine, pending: 0 };
 }
 
 // pushPending envía la cola de comandos al servidor y aplica el delta
-// resultante.
+// resultante. Si llega un comando durante un push en vuelo (dirty), se
+// relanza al terminar en vez de perderse el reintento.
 export async function pushPending(): Promise<void> {
-  if (inFlight) return;
+  if (inFlight) {
+    dirty = true;
+    return;
+  }
   inFlight = true;
   try {
-    const ws = activeWs.value;
-    if (!ws || !getToken()) return;
-    await pull(ws); // primero converger: menos conflictos LWW
-
-    // Comandos pendientes (solo lectura): se borran por id SOLO tras un
-    // push exitoso — un fallo de red no pierde datos y un comando que se
-    // encole durante el push en vuelo sobrevive al bulkDelete.
-    const pending = await queueCommands();
-    if (pending.length === 0) return;
-
-    try {
-      const delta = await apiFetch<{ cursor: number; changes: Change[] }>(
-        "/sync/push" + (ws ? "?workspace=" + encodeURIComponent(ws) : ""),
-        {
-          method: "POST",
-          body: JSON.stringify({ commands: pending.map((c) => c.payload) }),
-        },
-      );
-      await applyChanges(delta.changes ?? [], delta.cursor ?? (await getCursor(ws ?? undefined)), ws ?? "");
-      await queueDB.commands.bulkDelete(pending.map((c) => c.id!));
-    } catch (e) {
-      // 403 = sin permiso tras refresh válido: se descarta la cola (el
-      // servidor decidió) y se avisa. 401/transitorio: la cola se
-      // conserva intacta y se reintenta al reconectar (nunca perder
-      // datos — ver AGENTS: offline-first).
-      const msg = (e as Error).message ?? String(e);
-      if (msg.includes("HTTP 403")) {
-        await clearQueue();
-        showToast("sincronización rechazada por el servidor");
-      }
-    }
+    do {
+      dirty = false;
+      await pushOnce();
+    } while (dirty);
   } finally {
     inFlight = false;
+  }
+}
+
+async function pushOnce(): Promise<void> {
+  const ws = activeWs.value;
+  if (!ws || !getToken()) return;
+  await pull(ws); // primero converger: menos conflictos LWW
+
+  // Comandos pendientes (solo lectura): se borran por id SOLO tras un
+  // push exitoso — un fallo de red no pierde datos y un comando que se
+  // encole durante el push en vuelo sobrevive al bulkDelete.
+  const pending = await queueCommands();
+  if (pending.length === 0) return;
+
+  try {
+    const delta = await apiFetch<{ cursor: number; changes: Change[] }>(
+      "/sync/push" + (ws ? "?workspace=" + encodeURIComponent(ws) : ""),
+      {
+        method: "POST",
+        body: JSON.stringify({ commands: pending.map((c) => c.payload) }),
+      },
+    );
+    await applyChanges(delta.changes ?? [], delta.cursor ?? (await getCursor(ws ?? undefined)), ws ?? "");
+    await queueDB.commands.bulkDelete(pending.map((c) => c.id!));
+  } catch (e) {
+    // 403 = sin permiso tras refresh válido: se descarta la cola (el
+    // servidor decidió) y se avisa. 401/transitorio: la cola se
+    // conserva intacta y se reintenta al reconectar (nunca perder
+    // datos — ver AGENTS: offline-first).
+    const msg = (e as Error).message ?? String(e);
+    const code = (e as { code?: string }).code;
+    if (code === "forbidden" || msg.includes("HTTP 403")) {
+      // solo los comandos de ESTE push: los que se encolaron después
+      // (dirty) sobreviven — el comentario de arriba es una promesa
+      await queueDB.commands.bulkDelete(pending.map((c) => c.id!));
+      showToast(t("sync.rejected"));
+    }
   }
 }
 
@@ -101,6 +117,8 @@ export function initSyncAuto(): void {
   });
   window.addEventListener("focus", () => {
     const ws = activeWs.value;
-    if (ws) void pull(ws);
+    if (!ws) return;
+    void pull(ws);
+    void pushPending();
   });
 }

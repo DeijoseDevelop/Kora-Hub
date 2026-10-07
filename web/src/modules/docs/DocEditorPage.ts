@@ -5,6 +5,7 @@ import { getLocalDocById, saveDocLocal } from "../../data/mutations";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { parseLine } from "../../tasks/parser";
 import { escapeHtml, formatDate, isOverdue, showToast } from "../../ui/kit";
+import { sanitizeHTML } from "../../ui/sanitize";
 import { attachmentsApi, docsApi, sharesApi, type Backlink, type DocVersion, type ShareState } from "../../api/client";
 import { activeWs } from "../../data/workspace";
 import { lineDiff } from "./diff";
@@ -243,7 +244,7 @@ export class DocEditorPage extends NixComponent {
     if (!preview) return;
     let html: string;
     try {
-      html = marked.parse(md, { breaks: true, gfm: true }) as string;
+      html = sanitizeHTML(marked.parse(md, { breaks: true, gfm: true }) as string);
     } catch {
       html = `<pre>${escapeHtml(md)}</pre>`;
     }

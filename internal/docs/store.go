@@ -102,14 +102,48 @@ func (s *Store) ReadVersion(workspaceSlug, relPath string) ([]byte, error) {
 }
 
 func (s *Store) resolve(workspaceSlug, relPath string) string {
-	// saneamiento: nunca escapar de la raíz del workspace
+	// saneamiento: el slug y el path nunca escapan de data/workspaces
+	root := filepath.Join(s.root, safeSeg(workspaceSlug))
 	clean := filepath.Clean(relPath)
-	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
-		return filepath.Join(s.root, workspaceSlug)
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return root
 	}
-	full := filepath.Join(s.root, workspaceSlug, clean)
-	if rel, err := filepath.Rel(filepath.Join(s.root, workspaceSlug), full); err != nil || strings.HasPrefix(rel, "..") {
-		return filepath.Join(s.root, workspaceSlug)
+	if strings.ContainsRune(clean, 0) {
+		return root
+	}
+	full := filepath.Join(root, clean)
+	if rel, err := filepath.Rel(root, full); err != nil || strings.HasPrefix(rel, "..") {
+		return root
 	}
 	return full
+}
+
+// safeSeg neutraliza un segmento de ruta que se supone simple (slug de
+// workspace): sin separadores ni puntos suspensivos.
+func safeSeg(seg string) string {
+	if seg == "" || seg == "." || seg == ".." {
+		return "_"
+	}
+	if strings.ContainsAny(seg, `/\`) || strings.ContainsRune(seg, 0) {
+		return "_"
+	}
+	return seg
+}
+
+// ValidSlug reporta si un slug de workspace es seguro como directorio
+// (letras minúsculas, dígitos y guiones; sin puntos ni barras).
+func ValidSlug(slug string) bool {
+	if len(slug) < 1 || len(slug) > 63 {
+		return false
+	}
+	for _, r := range slug {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return false
+		}
+	}
+	// ni '..' ni guiones extremos/dobles que confundan al filesystem
+	if strings.HasPrefix(slug, "-") || strings.HasSuffix(slug, "-") || strings.Contains(slug, "--") {
+		return false
+	}
+	return true
 }

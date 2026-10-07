@@ -442,6 +442,28 @@ func (q *Queries) SetTaskDone(ctx context.Context, arg SetTaskDoneParams) error 
 	return err
 }
 
+const setTaskState = `-- name: SetTaskState :exec
+UPDATE tasks SET done = ?, in_progress = ?, updated_at = datetime('now')
+WHERE id = ? AND workspace_id = ?
+`
+
+type SetTaskStateParams struct {
+	Done        int64  `json:"done"`
+	InProgress  int64  `json:"in_progress"`
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+}
+
+func (q *Queries) SetTaskState(ctx context.Context, arg SetTaskStateParams) error {
+	_, err := q.db.ExecContext(ctx, setTaskState,
+		arg.Done,
+		arg.InProgress,
+		arg.ID,
+		arg.WorkspaceID,
+	)
+	return err
+}
+
 const upsertTask = `-- name: UpsertTask :exec
 INSERT INTO tasks (id, workspace_id, doc_id, line_no, title, due_date,
                    project, priority, assignee, done, in_progress,

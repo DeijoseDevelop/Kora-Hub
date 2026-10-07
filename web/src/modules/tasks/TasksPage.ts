@@ -2,7 +2,7 @@ import { NixComponent, html, signal, type NixTemplate } from "@deijose/nix-js";
 import { localTasks } from "../../data/store";
 import { activeWs } from "../../data/workspace";
 import { tasksView } from "../../data/tasks-view";
-import { toggleTaskLocal, quickAddLocal } from "../../data/mutations";
+import { toggleTaskLocal, quickAddLocal, setTaskStateLocal } from "../../data/mutations";
 import { currentRole } from "../../api/role";
 import { formatDate, isOverdue, showPrompt, showToast } from "../../ui/kit";
 import { t as tr, tList, locale } from "../../i18n";
@@ -188,14 +188,14 @@ function taskBadges(t: LocalTask): NixTemplate {
 
 // ---------------------------- Kanban ----------------------------
 
-function kanbanColumn(label: string, dot: string, getter: () => LocalTask[]): NixTemplate {
+function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter: () => LocalTask[]): NixTemplate {
   return html`
     <div class=${"kanban-col" + " " + dot}>
       <div class="kanban-col-header">
         <span><span class="dot"></span>${label}</span>
         <span class="count">${() => getter().length}</span>
       </div>
-      <div class="kanban-col-body" data-done=${dot === "done" ? "1" : "0"}
+      <div class="kanban-col-body" data-state=${state}
         @dragover=${(ev: DragEvent) => {
       ev.preventDefault();
       ev.dataTransfer!.dropEffect = "move";
@@ -207,7 +207,11 @@ function kanbanColumn(label: string, dot: string, getter: () => LocalTask[]): Ni
       (ev.currentTarget as HTMLElement).classList.remove("drag-over");
       const id = ev.dataTransfer?.getData("text/plain");
       const target = localTasks.value.find((t) => t.id === id);
-      if (target) void toggle(target);
+      // semántica por columna: todo→[ ] doing→[~] done→[x] (no un flip)
+      if (target) {
+        const cur: " " | "x" | "~" = target.done ? "x" : target.inProgress ? "~" : " ";
+        if (cur !== state) void setTaskStateLocal(target, state);
+      }
     }}>
         ${() =>
       getter().map((t) => html`
@@ -250,9 +254,9 @@ function kanbanView(): NixTemplate {
       <span class="quick-add-hint">${() => tr("tasks.quick_hint")}</span>
     </div>
     <div class="kanban-board">
-      ${() => kanbanColumn(tr("tasks.todo"), "todo", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && !t.inProgress))}
-      ${() => kanbanColumn(tr("tasks.doing"), "doing", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && t.inProgress))}
-      ${() => kanbanColumn(tr("tasks.done"), "done", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && t.done))}
+      ${() => kanbanColumn(tr("tasks.todo"), "todo", " ", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && !t.inProgress))}
+      ${() => kanbanColumn(tr("tasks.doing"), "doing", "~", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && !t.done && t.inProgress))}
+      ${() => kanbanColumn(tr("tasks.done"), "done", "x", () => localTasks.value.filter((t) => t.workspaceId === activeWs.value && t.done))}
     </div>
     <p class="muted" style="padding: 0 20px 14px">${() => tr("tasks.drag_hint")}</p>
   `;
@@ -389,7 +393,7 @@ export class TasksPage extends NixComponent {
           <h2>${() => tr("tasks.title")}</h2>
           <div class="tabs">
             ${(["kanban", "tabla", "calendario"] as const).map(
-      (v) => html`<button class=${"tab" + (tasksView.value === v ? " active" : "")}
+      (v) => html`<button class=${() => "tab" + (tasksView.value === v ? " active" : "")}
                 @click=${() => (tasksView.value = v)}>${() => tr({ kanban: "app.nav.kanban", tabla: "app.nav.table", calendario: "app.nav.calendar" }[v])}</button>`,
     )}
           </div>

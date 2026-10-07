@@ -291,6 +291,11 @@ export const tasksApi = {
 
 export const searchApi = {
   docs: (q: string) => api<{ results: SearchResult[] }>(`/search?q=${encodeURIComponent(q)}`),
+  // tipo: doc | tarea | adjunto (sección 4.2)
+  apply: (q: string, tipo?: string) =>
+    api<{ results: SearchResult[] }>(
+      `/search?q=${encodeURIComponent(q)}${tipo ? `&tipo=${encodeURIComponent(tipo)}` : ""}`,
+    ),
 };
 
 export interface Member {

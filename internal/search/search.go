@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // Result es un documento que matcheó la búsqueda.
@@ -34,7 +35,7 @@ func SearchDocs(ctx context.Context, conn *sql.DB, workspaceID, q string, limit 
 	if q == "" {
 		return nil, nil
 	}
-	rows, err := conn.QueryContext(ctx, query, q, workspaceID, limit)
+	rows, err := conn.QueryContext(ctx, query, escapeFTS(q), workspaceID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("fts5: %w", err)
 	}
@@ -49,4 +50,12 @@ func SearchDocs(ctx context.Context, conn *sql.DB, workspaceID, q string, limit 
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// escapeFTS envuelve la consulta en comillas para que sea un literal
+// FTS5: sin esto, entradas con comillas o con AND/OR/NOT rompen la
+// sintaxis del MATCH y la búsqueda devuelve 500.
+func escapeFTS(q string) string {
+	q = strings.ReplaceAll(q, `"`, `""`)
+	return `"` + q + `"`
 }

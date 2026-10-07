@@ -60,7 +60,11 @@ func New(cfg *config.Config, queries *db.Queries, conn *sql.DB, logger *slog.Log
 // Router construye el árbol de rutas.
 func (s *Server) Router(webFS fs.FS) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery(), securityHeaders())
+	// sin proxies de confianza: ClientIP() es la IP del socket, no la
+	// que el cliente declare en X-Forwarded-For (si no, el rate-limit
+	// por IP se bypasea rotando la cabecera)
+	_ = r.SetTrustedProxies(nil)
+	r.Use(gin.Logger(), gin.Recovery(), securityHeaders(), limitBody(8<<20))
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "version": Version})

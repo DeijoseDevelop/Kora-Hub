@@ -208,3 +208,118 @@ func TestPullIsIncremental(t *testing.T) {
 		t.Fatalf("delta incremental incorrecto: %+v", second.Changes)
 	}
 }
+
+// TestPullCursorDoesNotSkipOnLimit: el cursor del pull debe ser el seq
+// de la última fila ENTREGADA, no el máximo global — si no, los
+// cambios que no caben en un page se pierden para siempre.
+func TestPullCursorDoesNotSkipOnLimit(t *testing.T) {
+	eng, _, _, wsID, slug := setup(t)
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ {
+		_, err := eng.Push(ctx, wsID, slug, []PushCommand{{
+			IdempotencyKey: ulid.Make().String(),
+			Op:             "doc.upsert",
+			Path:           "doc" + string(rune('a'+i)) + ".md",
+			Content:        "- [ ] t\n",
+			UpdatedAt:      "2026-08-15 10:0" + string(rune('0'+i)) + ":00",
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page1, err := eng.Pull(ctx, wsID, 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page1.Changes) != 2 {
+		t.Fatalf("page1 = %d cambios", len(page1.Changes))
+	}
+
+	// continuar desde el cursor del page1: los 3 restantes, ninguno perdido
+	page2, err := eng.Pull(ctx, wsID, page1.Cursor, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page2.Changes) != 3 {
+		t.Fatalf("page2 = %d cambios (esperaba 3) — el cursor se saltó filas", len(page2.Changes))
+	}
+}
+
+// TestPushWithoutUpdatedAtPreservesLoser: sin updated_at el comando
+// gana (compat) pero la versión perdedora se preserva en doc_versions
+// (§9: la versión perdedora NUNCA se pierde).
+func TestPushWithoutUpdatedAtPreservesLoser(t *testing.T) {
+	eng, queries, _, wsID, slug := setup(t)
+	ctx := context.Background()
+
+	_, err := eng.Push(ctx, wsID, slug, []PushCommand{{
+		IdempotencyKey: "u1", Op: "doc.upsert", Path: "lww.md",
+		Content: "- [ ] contenido original del servidor\n",
+		UpdatedAt: "2026-08-15 10:00:00",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// push sin updated_at: gana, pero el contenido previo se preserva
+	_, err = eng.Push(ctx, wsID, slug, []PushCommand{{
+		IdempotencyKey: "u2", Op: "doc.upsert", Path: "lww.md",
+		Content: "- [ ] contenido nuevo del cliente\n",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc, err := queries.GetDocByPath(ctx, db.GetDocByPathParams{WorkspaceID: wsID, Path: "lww.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions, err := queries.GetDocVersions(ctx, db.GetDocVersionsParams{DocID: doc.ID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(versions) == 0 {
+		t.Fatal("la versión perdedora debe quedar en doc_versions")
+	}
+	// el hash del snapshot debe ser el del contenido original perdedor
+	wantHash := docs.ContentHash([]byte("- [ ] contenido original del servidor\n"))
+	found := false
+	for _, v := range versions {
+		if v.ContentHash == wantHash {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("el snapshot de la versión perdedora no contiene el contenido original")
+	}
+}
+
+// TestDocDeleteIsIdempotent: repetir doc.delete no deja el batch clavado.
+func TestDocDeleteIsIdempotent(t *testing.T) {
+	eng, _, _, wsID, slug := setup(t)
+	ctx := context.Background()
+
+	_, err := eng.Push(ctx, wsID, slug, []PushCommand{{
+		IdempotencyKey: "d1", Op: "doc.upsert", Path: "borrar.md",
+		Content: "- [ ] t\n", UpdatedAt: "2026-08-15 10:00:00",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	docList, err := eng.Pull(ctx, wsID, 0, 10)
+	if err != nil || len(docList.Changes) == 0 {
+		t.Fatalf("pull: %v %+v", err, docList)
+	}
+	docID := docList.Changes[0].EntityID
+
+	for i := 0; i < 2; i++ {
+		_, err := eng.Push(ctx, wsID, slug, []PushCommand{{
+			IdempotencyKey: "del" + string(rune('0'+i)), Op: "doc.delete", DocID: docID,
+		}})
+		if err != nil {
+			t.Fatalf("doc.delete #%d: %v", i, err)
+		}
+	}
+}

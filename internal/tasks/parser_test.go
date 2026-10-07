@@ -212,10 +212,103 @@ func TestRoundTripPreservesText(t *testing.T) {
 	if !ok {
 		t.Fatal("no parseó")
 	}
-	rewritten := RoundTrip(task, true, "2026-08-20", "zekrost", "alta", "deiver")
+	rewritten := RoundTrip(task, StateDone, "2026-08-20", "zekrost", "alta", "deiver")
 	want := "- [x] Preparar propuesta comercial #2026-08-20 @zekrost !alta ~deiver +ventas"
 	if rewritten != want {
 		t.Errorf("round-trip = %q\nwant         %q", rewritten, want)
+	}
+}
+
+// TestRoundTripCheckedLines cubre la regresion critica: mutar una tarea
+// [x]/[~] reescribia la linea duplicando el checkbox o borrando el
+// titulo (los tests previos solo partian de lineas abiertas).
+func TestRoundTripCheckedLines(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		state    string
+		due      string
+		project  string
+		priority string
+		assignee string
+		want     string
+	}{
+		{
+			"hecha sin cambios conserva la linea",
+			"- [x] Enviar informe semanal", StateDone, "", "", "", "",
+			"- [x] Enviar informe semanal",
+		},
+		{
+			"reabrir tarea hecha conserva el texto",
+			"- [x] Enviar informe semanal", StateOpen, "", "", "", "",
+			"- [ ] Enviar informe semanal",
+		},
+		{
+			"en progreso sin cambios",
+			"- [~] Revisar PR #2026-01-01", StateProgress, "", "", "", "",
+			"- [~] Revisar PR #2026-01-01",
+		},
+		{
+			"completar tarea en progreso",
+			"- [~] Revisar PR #2026-01-01", StateDone, "", "", "", "",
+			"- [x] Revisar PR #2026-01-01",
+		},
+		{
+			"editar metadatos de tarea hecha",
+			"- [x] Informe anual @viejo !baja", StateDone, "2026-05-01", "nuevo", "alta", "deiver",
+			// los slots existentes se reemplazan en su posición; los nuevos
+			// se añaden al final en orden canónico (# @ ! ~)
+			"- [x] Informe anual @nuevo !alta #2026-05-01 ~deiver",
+		},
+		{
+			"solo el primer slot de cada tipo",
+			"- [ ] t #2026-01-01 #2026-02-02 @a @b", StateOpen, "2026-03-03", "c", "", "",
+			"- [ ] t #2026-03-03 #2026-02-02 @c @b",
+		},
+		{
+			"valores con espacios se re-citan",
+			`- [ ] Plan @"kora hub"`, StateOpen, "", "otro proyecto", "", "",
+			`- [ ] Plan @"otro proyecto"`,
+		},
+		{
+			"tokens invalidos son texto y no se mutan",
+			"- [ ] Comprar #regalo !fuerte", StateDone, "2026-01-01", "p", "alta", "a",
+			"- [x] Comprar #regalo !fuerte #2026-01-01 @p !alta ~a",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task, ok := ParseLine(tt.line)
+			if !ok {
+				t.Fatalf("ParseLine(%q) no parseó", tt.line)
+			}
+			got := RoundTrip(task, tt.state, tt.due, tt.project, tt.priority, tt.assignee)
+			if got != tt.want {
+				t.Errorf("RoundTrip = %q\nwant       %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestRoundTripIdempotent: aplicar RoundTrip sin cambios reproduce la
+// misma linea (invariante de seccion 6.2).
+func TestRoundTripIdempotent(t *testing.T) {
+	lines := []string{
+		"- [ ] Preparar propuesta #2026-08-20 @zekrost !alta ~deiver +ventas",
+		"- [x] Enviar informe ^id:x1 ^blocked-by:y",
+		"- [~] Revisar *every:1w #hoy",
+		`- [ ] Plan @"kora hub" ~"Jane Doe"`,
+		"- [ ] Comprar #regalo !fuerte",
+	}
+	for _, line := range lines {
+		task, ok := ParseLine(line)
+		if !ok {
+			t.Fatalf("ParseLine(%q) no parseó", line)
+		}
+		got := RoundTrip(task, StateOf(task), "", "", "", "")
+		if got != task.RawLine {
+			t.Errorf("no idempotente:\n got %q\nwant %q", got, task.RawLine)
+		}
 	}
 }
 
@@ -225,13 +318,44 @@ func TestRoundTripPreservesUnknownTokens(t *testing.T) {
 	if !ok {
 		t.Fatal("no parseó")
 	}
-	rewritten := RoundTrip(task, true, "", "", "", "")
+	rewritten := RoundTrip(task, StateDone, "", "", "", "")
 	// los tokens desconocidos se conservan; la fecha relativa se conserva tal cual
 	if !contains(rewritten, "^importante") {
 		t.Errorf("token desconocido perdido: %q", rewritten)
 	}
 	if !contains(rewritten, "#hoy") {
 		t.Errorf("fecha relativa perdida: %q", rewritten)
+	}
+}
+
+// TestParseLineTolerantCheckbox: [X] y tabulador se aceptan (espejo TS).
+func TestParseLineTolerantCheckbox(t *testing.T) {
+	task, ok := ParseLine("- [X] tarea hecha")
+	if !ok || !task.Done {
+		t.Fatalf("[X] deberia ser hecha: ok=%v done=%v", ok, task.Done)
+	}
+	task, ok = ParseLine("-\ttarea con tab")
+	if ok {
+		t.Fatalf("sin checkbox no es tarea: %v", task)
+	}
+	task, ok = ParseLine("-\t[x] con tabulador")
+	if !ok || !task.Done {
+		t.Fatalf("tabulador tras guion deberia valer: ok=%v", ok)
+	}
+}
+
+// TestParseLineHashtagInTitle: #no-fecha es texto del titulo, no un
+// slot (regresión de la divergencia Go↔TS).
+func TestParseLineHashtagInTitle(t *testing.T) {
+	task, ok := ParseLine("- [ ] Comprar #regalo para ana")
+	if !ok {
+		t.Fatal("no parseó")
+	}
+	if task.Text != "Comprar #regalo para ana" {
+		t.Errorf("text = %q", task.Text)
+	}
+	if task.DueDate != "" {
+		t.Errorf("due_date = %q, want vacío", task.DueDate)
 	}
 }
 

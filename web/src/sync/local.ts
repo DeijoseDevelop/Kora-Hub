@@ -128,8 +128,11 @@ export async function applyChanges(changes: Change[], cursor: number, workspaceI
     // Un doc creado localmente (id local-*) conserva su id: la UI ya
     // navega con él. El id del servidor se adopta en `serverId` para los
     // endpoints REST por id (evita duplicados por path sin romper la
-    // navegación).
-    const byPath = await localDB.docs.where("path").equals(ch.doc.path).first();
+    // navegación). El match por path es por workspace: dos workspaces
+    // pueden tener ambos un inbox.md y nunca deben fusionarse.
+    const byPath = await localDB.docs
+      .filter((d) => d.path === ch.doc!.path && d.workspaceId === workspaceId && d.deleted !== 1)
+      .first();
     if (byPath) {
       await localDB.docs.update(byPath.id, {
         title: ch.doc.title,

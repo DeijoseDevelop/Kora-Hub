@@ -46,6 +46,10 @@ DELETE FROM tasks WHERE doc_id = ?;
 UPDATE tasks SET done = ?, in_progress = 0, updated_at = datetime('now')
 WHERE id = ? AND workspace_id = ?;
 
+-- name: SetTaskState :exec
+UPDATE tasks SET done = ?, in_progress = ?, updated_at = datetime('now')
+WHERE id = ? AND workspace_id = ?;
+
 -- name: ListTasksByDateRange :many
 SELECT * FROM tasks
 WHERE workspace_id = ? AND due_date >= ? AND due_date <= ?

@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/DeijoseDevelop/Kora-Hub/internal/db"
+	"github.com/gin-gonic/gin"
 )
 
 // --------------------------- Workspace admin ---------------------------
@@ -87,25 +88,38 @@ func (s *Server) handleDeleteWorkspace(c *gin.Context) {
 	if !ok || !s.requireOwnerRole(c, r.role) {
 		return
 	}
-	for _, fn := range []func() error{
-		func() error { return s.queries.DeleteWorkspaceIndex(c, r.workspace.ID) },
-		func() error { return s.queries.DeleteWorkspaceTasks(c, r.workspace.ID) },
-		func() error { return s.queries.DeleteWorkspaceChanges(c, r.workspace.ID) },
-		func() error { return s.queries.DeleteWorkspaceCommands(c, r.workspace.ID) },
-		func() error { return s.queries.DeleteWorkspaceAttachments(c, r.workspace.ID) },
-		func() error { return s.queries.DeleteMembershipsOfWorkspace(c, r.workspace.ID) },
-		func() error { return s.queries.DeleteWorkspaceRows(c, r.workspace.ID) },
+	// orden FK-safe: primero las tablas hijas de docs, luego docs, luego
+	// las del workspace. Sin esto, DELETE FROM docs falla con
+	// foreign_keys(1) si hay tareas/versiones/shares/adjuntos.
+	for _, stmt := range []string{
+		`DELETE FROM doc_shares WHERE doc_id IN (SELECT id FROM docs WHERE workspace_id = ?)`,
+		`DELETE FROM doc_versions WHERE doc_id IN (SELECT id FROM docs WHERE workspace_id = ?)`,
+		`DELETE FROM tasks WHERE workspace_id = ?`,
+		`DELETE FROM attachments WHERE workspace_id = ?`,
+		`DELETE FROM backlinks WHERE src_doc_id IN (SELECT id FROM docs WHERE workspace_id = ?)`,
+		`DELETE FROM backlinks WHERE dst_doc_id IN (SELECT id FROM docs WHERE workspace_id = ?)`,
+		`DELETE FROM docs_fts WHERE doc_id IN (SELECT id FROM docs WHERE workspace_id = ?)`,
+		`DELETE FROM saved_views WHERE workspace_id = ?`,
+		`DELETE FROM change_log WHERE workspace_id = ?`,
+		`DELETE FROM sync_commands WHERE workspace_id = ?`,
+		`DELETE FROM webhooks WHERE workspace_id = ?`,
+		`DELETE FROM audit_log WHERE workspace_id = ?`,
+		`DELETE FROM docs WHERE workspace_id = ?`,
+		`DELETE FROM memberships WHERE workspace_id = ?`,
+		`DELETE FROM workspaces WHERE id = ?`,
 	} {
-		if err := fn(); err != nil {
+		if _, err := s.conn.ExecContext(c, stmt, r.workspace.ID); err != nil {
+			s.logger.Warn("delete workspace", "stmt", stmt, "err", err)
 			s.fail(c, http.StatusInternalServerError, "internal", "no se pudo eliminar el workspace")
 			return
 		}
 	}
-	// los FTS/backlinks cuelgan de docs; se limpian en la misma pasada
-	_, _ = s.conn.ExecContext(c, `DELETE FROM docs_fts WHERE doc_id NOT IN (SELECT id FROM docs)`)
-	_, _ = s.conn.ExecContext(c, `DELETE FROM backlinks WHERE src_doc_id NOT IN (SELECT id FROM docs)`)
-	if err := os.RemoveAll(filepath.Join(s.cfg.DataDir, "workspaces", r.workspace.Slug)); err != nil {
-		s.logger.Warn("borrando árbol canónico del workspace", "slug", r.workspace.Slug, "err", err)
+	// el slug ya está validado al crear; se usa como segmento simple
+	slug := r.workspace.Slug
+	if strings.ContainsAny(slug, `/\`) || slug == ".." || slug == "." {
+		s.logger.Error("slug de workspace inseguro al borrar", "slug", slug)
+	} else if err := os.RemoveAll(filepath.Join(s.cfg.DataDir, "workspaces", slug)); err != nil {
+		s.logger.Warn("borrando árbol canónico del workspace", "slug", slug, "err", err)
 	}
 	c.JSON(http.StatusNoContent, nil)
 }

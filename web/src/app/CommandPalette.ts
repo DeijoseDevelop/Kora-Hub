@@ -21,20 +21,33 @@ interface PaletteItem {
 export class CommandPalette extends NixComponent {
   private open = signal(false);
   private query = signal("");
-  private selected = 0;
+  private selected = signal(0);
   private items = signal<PaletteItem[]>([]);
 
   toggle(): void {
     this.open.value = !this.open.value;
     if (this.open.value) {
       this.query.value = "";
-      this.selected = 0;
+      this.selected.value = 0;
       this.rebuild();
+      // el input debe recibir el foco o las flechas no llegan al keydown
+      queueMicrotask(() => {
+        try {
+          document.querySelector<HTMLInputElement>(".palette-input input")?.focus();
+          this.paintSelection();
+        } catch {
+          /* entorno sin DOM real (tests): no-op */
+        }
+      });
     }
   }
 
   close(): void {
     this.open.value = false;
+  }
+
+  isOpen(): boolean {
+    return this.open.value;
   }
 
   private rebuild(): void {
@@ -77,25 +90,43 @@ export class CommandPalette extends NixComponent {
     }
 
     this.items.value = q ? items.filter((it) => fuzzyMatch(q, it.label + " " + it.sub)) : items;
-    this.selected = 0;
+    this.selected.value = 0;
   }
 
-  private keydown(ev: KeyboardEvent): void {
+  keydown(ev: KeyboardEvent): void {
     if (ev.key === "Escape") {
       this.close();
     } else if (ev.key === "ArrowDown") {
       ev.preventDefault();
-      this.selected = Math.min(this.items.value.length - 1, this.selected + 1);
+      ev.stopPropagation();
+      this.selected.value = Math.min(this.items.value.length - 1, this.selected.value + 1);
+      this.paintSelection();
     } else if (ev.key === "ArrowUp") {
       ev.preventDefault();
-      this.selected = Math.max(0, this.selected - 1);
+      ev.stopPropagation();
+      this.selected.value = Math.max(0, this.selected.value - 1);
+      this.paintSelection();
     } else if (ev.key === "Enter") {
       ev.preventDefault();
-      const it = this.items.value[this.selected];
+      const it = this.items.value[this.selected.value];
       if (it) {
         it.action();
         this.close();
       }
+    }
+  }
+
+  // paintSelection pinta el highlight a mano. Nix.js no re-evalúa los
+  // bindings de `class` dentro de un .map() anidado al cambiar un signal
+  // (los values estáticos se congelan al montar) — se toca el DOM.
+  private paintSelection(): void {
+    if (typeof document === "undefined") return;
+    const nodes = document.querySelectorAll(".palette-item");
+    if (nodes.length === 0) return;
+    nodes.forEach((el, i) => el.classList.toggle("selected", i === this.selected.value));
+    const active = nodes[this.selected.value];
+    if (active && typeof (active as HTMLElement).scrollIntoView === "function") {
+      (active as HTMLElement).scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -131,15 +162,22 @@ export class CommandPalette extends NixComponent {
                 if (!group.length) return "";
                 return html`
                           <div class="palette-section-label">${groupLabel[kind]}</div>
-                          ${group.map((it) => html`
-                            <div class=${"palette-item" + (this.items.value.indexOf(it) === this.selected ? " selected" : "")}
+                          ${group.map((it) => {
+                    const idx = this.items.value.indexOf(it);
+                    return html`
+                            <div class=${"palette-item" + (idx === this.selected.value ? " selected" : "")}
+                              data-idx=${String(idx)}
                               @click=${() => {
-                    it.action();
-                    this.close();
-                  }}
-                              @mouseenter=${() => (this.selected = this.items.value.indexOf(it))}>
+                      it.action();
+                      this.close();
+                    }}
+                              @mouseenter=${() => {
+                      this.selected.value = idx;
+                      this.paintSelection();
+                    }}>
                               <span class="pi-text">${it.label}<span class="pi-sub"> · ${it.sub}</span></span>
-                            </div>`)}`;
+                            </div>`;
+                  })}`;
               })}
                     ${() =>
               this.items.value.length === 0

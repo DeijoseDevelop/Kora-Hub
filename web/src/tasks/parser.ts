@@ -33,10 +33,11 @@ export interface ParsedTask {
 
 export function parseLine(line: string): ParsedTask | null {
   const trimmed = line.replace(/[ \t]+$/, "");
-  // checkbox estricto: '- [ ]' requiere espacio tras ']'
-  const m = /^-\s\[([ xX~])\]\s+(.+)$/.exec(trimmed);
+  // checkbox estricto: '- [ ]' requiere espacio tras ']'; [X] cuenta
+  // como hecha (estilo GitHub) y se acepta tabulador tras '-'.
+  const m = /^-[ \t]\[([ xX~])\][ \t]+(.+)$/.exec(trimmed);
   if (!m) return null;
-  const state = m[1].toLowerCase();
+  const state = m[1] === "X" ? "x" : m[1];
   const rest = m[2];
 
   const t: ParsedTask = {
@@ -60,7 +61,7 @@ export function parseLine(line: string): ParsedTask | null {
     if (p.startsWith("#")) {
       const d = resolveDateISO(p.slice(1));
       if (d) t.dueDate = d;
-      else textParts.push(p);
+      else textParts.push(p); // #no-fecha es texto (hashtag), no un slot
     } else if (p.startsWith("*every:") && isRecurInterval(p.slice(7))) {
       t.recur = p.slice(7);
     } else if (p.startsWith("^id:") && isIdentValue(p.slice(4))) {
@@ -97,53 +98,75 @@ export function parse(content: string): ParsedTask[] {
 }
 
 // RoundTrip reescribe la línea original tras una mutación, preservando
-// al byte el texto que no es metadato.
+// al byte el texto que no es metadato. state es el nuevo estado del
+// checkbox (" " | "x" | "~"). Un parámetro vacío/null conserva el token
+// original; si trae valor se reemplaza la primera aparición válida de
+// ese slot y, si no existía, se añade al final.
 export function roundTrip(
   t: ParsedTask,
-  done: boolean,
+  state: TaskState,
   due?: string | null,
   project?: string | null,
   priority?: string | null,
   assignee?: string | null,
 ): string {
-  const fields = t.rawLine.split(/\s+/);
-  const head = "- [" + (done ? "x" : t.inProgress ? "~" : " ") + "]";
-  const out: string[] = [head];
-  // '- [ ]' se parte en 3 tokens al hacer split
-  const rest = fields.slice(3);
-  let wroteText = false;
-  for (const p of rest) {
-    if (p.startsWith("#")) {
-      if (due) out.push("#" + due);
-      else out.push(p);
-    } else if (p.startsWith("@")) {
-      if (project) out.push("@" + project);
-      else out.push(p);
-    } else if (p.startsWith("!")) {
-      if (priority) out.push("!" + priority);
-      else out.push(p);
-    } else if (p.startsWith("~")) {
-      if (assignee) out.push("~" + assignee);
-      else out.push(p);
+  const m = /^-[ \t]\[([ xX~])\][ \t]+(.+)$/.exec(t.rawLine);
+  if (!m) return t.rawLine;
+  const out: string[] = ["- [" + normalizeState(state, t) + "]"];
+  const used = { due: false, project: false, priority: false, assignee: false };
+  for (const p of splitMeta(m[2])) {
+    if (p.startsWith("#") && resolveDateISO(p.slice(1))) {
+      if (due && !used.due) {
+        out.push("#" + quoteValue(due));
+        used.due = true;
+      } else out.push(p);
+    } else if (p.startsWith("@") && isIdentValue(p.slice(1))) {
+      if (project && !used.project) {
+        out.push("@" + quoteValue(project));
+        used.project = true;
+      } else out.push(p);
+    } else if (p.startsWith("!") && isPriority(unquote(p.slice(1)))) {
+      if (priority && !used.priority) {
+        out.push("!" + quoteValue(priority));
+        used.priority = true;
+      } else out.push(p);
+    } else if (p.startsWith("~") && isIdentValue(p.slice(1))) {
+      if (assignee && !used.assignee) {
+        out.push("~" + quoteValue(assignee));
+        used.assignee = true;
+      } else out.push(p);
     } else {
-      if (!wroteText) {
-        out.push(p.trim());
-        wroteText = true;
-      } else {
-        out.push(p);
-      }
+      // texto y metadatos no mutables: se reescriben tal cual, al byte
+      out.push(p);
     }
   }
+  if (due && !used.due) out.push("#" + quoteValue(due));
+  if (project && !used.project) out.push("@" + quoteValue(project));
+  if (priority && !used.priority) out.push("!" + quoteValue(priority));
+  if (assignee && !used.assignee) out.push("~" + quoteValue(assignee));
   return out.join(" ");
+}
+
+export type TaskState = " " | "x" | "~";
+
+function normalizeState(state: TaskState, t: ParsedTask): TaskState {
+  if (state === "x" || state === "~" || state === " ") return state;
+  return t.done ? "x" : t.inProgress ? "~" : " ";
+}
+
+// quoteValue envuelve en comillas un valor que no sea un ident plano
+// (§6.5: cualquier valor admite "comillas" para admitir espacios).
+function quoteValue(s: string): string {
+  return isIdent(s) ? s : `"${s}"`;
 }
 
 // Aplica un cambio de estado a un documento completo: reescribe la línea
 // de la tarea y devuelve el contenido nuevo.
-export function applyTaskState(content: string, task: ParsedTask, done: boolean): string {
+export function applyTaskState(content: string, task: ParsedTask, state: TaskState): string {
   const lines = content.split("\n");
   const idx = task.line - 1;
   if (idx < 0 || idx >= lines.length) return content;
-  lines[idx] = roundTrip(task, done);
+  lines[idx] = roundTrip(task, state);
   return lines.join("\n");
 }
 
@@ -239,27 +262,35 @@ function normalizePriority(s: string): string {
   return s;
 }
 
-// Resuelve fechas relativas a AAAA-MM-DD. Devuelve null si no es fecha.
+// Resuelve fechas relativas a AAAA-MM-DD con componentes locales (nunca
+// UTC: cerca de medianoche toISOString da el día equivocado). Devuelve
+// null si no es fecha. Acepta abreviaturas (lun..dom) y nombres largos.
 export function resolveDateISO(raw: string): string | null {
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const now = new Date();
-  const iso = (d: Date) => d.toISOString().split("T")[0];
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   switch (raw.toLowerCase()) {
     case "hoy":
       return iso(now);
     case "mañana":
-      return iso(new Date(now.getTime() + 86400000));
+      return iso(plusDays(now, 1));
   }
-  const days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
-  const dayIdx = days.indexOf(raw.toLowerCase());
-  if (dayIdx >= 0) {
-    const target = dayIdx + 1; // 1..7, lunes=1
-    const cur = now.getDay() === 0 ? 7 : now.getDay(); // domingo=7
-    let diff = target - cur;
-    if (diff <= 0) diff += 7;
-    const d = new Date(now);
-    d.setDate(d.getDate() + diff);
-    return iso(d);
-  }
-  return null;
+  const days: Record<string, number> = {
+    lun: 1, mar: 2, mie: 3, jue: 4, vie: 5, sab: 6, dom: 7,
+    lunes: 1, martes: 2, "miércoles": 3, miercoles: 3, jueves: 4,
+    viernes: 5, "sábado": 6, sabado: 6, domingo: 7,
+  };
+  const target = days[raw.toLowerCase()];
+  if (target == null) return null;
+  const cur = now.getDay() === 0 ? 7 : now.getDay(); // domingo=7
+  let diff = target - cur;
+  if (diff <= 0) diff += 7;
+  return iso(plusDays(now, diff));
+}
+
+function plusDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
 }

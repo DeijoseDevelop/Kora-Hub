@@ -66,15 +66,23 @@ export async function getLocalDocById(id: string): Promise<LocalDoc | undefined>
 // toggleTaskLocal: round-trip local (la línea se reescribe al byte) y
 // todo el doc se sincroniza.
 export async function toggleTaskLocal(task: LocalTask): Promise<void> {
+  const next = task.done ? " " : "x";
+  await setTaskStateLocal(task, next);
+}
+
+// setTaskStateLocal fija el estado del checkbox (" " | "x" | "~") con
+// round-trip local: la línea se reescribe al byte y el doc se sincroniza.
+// Es el camino del kanban por columna (todo/doing/done).
+export async function setTaskStateLocal(task: LocalTask, state: " " | "x" | "~"): Promise<void> {
   const doc = await localDB.docs.get(task.docId);
   if (!doc) return;
   const tasks = parse(doc.content);
   const t = tasks.find((p) => p.line === task.lineNo);
   if (!t) return;
-  let content = applyTaskState(doc.content, t, !task.done);
+  let content = applyTaskState(doc.content, t, state);
   // recurrencia (§6.5): al completar, la siguiente ocurrencia se
   // inserta como línea nueva debajo — espejo del backend
-  if (!task.done && t.recur && t.dueDate) {
+  if (state === "x" && !t.done && t.recur && t.dueDate) {
     const next = nextOccurrence(t.dueDate, t.recur);
     if (next) {
       const lines = content.split("\n");
@@ -92,9 +100,12 @@ export async function quickAddLocal(text: string): Promise<LocalTask | null> {
   const line = "- [ ] " + text.trim();
   const parsed = parseLine(line);
   if (!parsed) return null;
-  const canonical = roundTrip(parsed, false, parsed.dueDate, parsed.project, parsed.priority, parsed.assignee);
+  const canonical = roundTrip(parsed, " ", parsed.dueDate, parsed.project, parsed.priority, parsed.assignee);
 
-  let inbox = await localDB.docs.where("path").equals("inbox.md").first();
+  const wsId = activeWs.value ?? "";
+  let inbox = await localDB.docs
+    .filter((d) => d.path === "inbox.md" && d.workspaceId === wsId && d.deleted !== 1)
+    .first();
   let id = inbox?.id;
   let content = inbox?.content ?? "";
   if (!inbox) {

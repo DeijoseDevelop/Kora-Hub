@@ -11,13 +11,14 @@ export function escapeHtml(s: unknown): string {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().split("T")[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function plusISO(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function isOverdue(dateStr: string): boolean {
@@ -43,35 +44,10 @@ export function formatDate(dateStr: string): string {
   return `${d.getDate()} ${tList("kit.months")[d.getMonth()]}`;
 }
 
-// fecha relativa -> ISO: #hoy #mañana #pasado mañana #lun..#dom #AAAA-MM-DD
-export function resolveDateISO(token: string): string | null {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const iso = (d: Date) => d.toISOString().split("T")[0];
-  switch (token.toLowerCase()) {
-    case "hoy":
-      return iso(today);
-    case "mañana":
-      return iso(new Date(today.getTime() + 86400000));
-    case "pasado mañana":
-      return iso(new Date(today.getTime() + 2 * 86400000));
-  }
-  const days = ["domingo", "lunes", "martes", "miércoles", "miércoles", "jueves", "viernes", "sábado"];
-  const dayIdx = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"].indexOf(
-    token.toLowerCase(),
-  );
-  if (dayIdx >= 0) {
-    const cur = today.getDay();
-    let diff = (dayIdx - cur + 7) % 7;
-    if (diff === 0) diff = 7;
-    const t = new Date(today);
-    t.setDate(t.getDate() + diff);
-    return iso(t);
-  }
-  void days;
-  return null;
-}
+// fecha relativa -> ISO: reutiliza el parser (misma gramática Go↔TS,
+// componentes locales — nunca toISOString, que da el día equivocado
+// cerca de medianoche).
+export { resolveDateISO } from "../tasks/parser";
 
 export function badgeDate(dateStr: string): string {
   const overdue = isOverdue(dateStr);

@@ -37,6 +37,10 @@ export class App extends NixComponent {
         this.palette.toggle();
       } else if (ev.key === "Escape") {
         this.palette.close();
+      } else if (this.palette.isOpen() && (ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "Enter")) {
+        // las flechas/Enter se manejan aquí: el foco puede no estar en el
+        // input del palette y el keydown del input nunca llegaría
+        this.palette.keydown(ev);
       }
     };
     const onOpenDoc = (ev: Event) => {
@@ -181,6 +185,7 @@ export class App extends NixComponent {
               ${(() => {
         const views: Array<{ label: string; isActive: (cur: string) => boolean; go: () => void }> = [
           { label: t("app.nav.docs"), isActive: (c) => c.startsWith("/docs"), go: () => router.navigate("/docs") },
+          { label: t("app.nav.search"), isActive: (c) => c.startsWith("/search"), go: () => router.navigate("/search") },
           { label: t("app.nav.kanban"), isActive: (c) => c.startsWith("/tasks") && !c.includes("view="), go: () => { setTasksView("kanban"); router.navigate("/tasks"); } },
           { label: t("app.nav.table"), isActive: (c) => c.includes("view=tabla"), go: () => { setTasksView("tabla"); router.navigate({ name: "tasks", query: { view: "tabla" } }); } },
           { label: t("app.nav.calendar"), isActive: (c) => c.includes("view=calendario"), go: () => { setTasksView("calendario"); router.navigate({ name: "tasks", query: { view: "calendario" } }); } },

@@ -67,6 +67,9 @@ func main() {
 		Addr:              cfg.BindAddr,
 		Handler:           srv.Router(web.FS()),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {

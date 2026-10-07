@@ -52,7 +52,7 @@ That file *is* your project board. Complete a task in the kanban and it marks th
 **⚙️ Platform**
 - **Offline-first by design**: local command queue with replay, delta sync on reconnect
 - **One binary**: Go + SQLite + embedded frontend. One container, one volume, zero external dependencies — `<100 MB RAM`
-- **API-first**: everything the UI can do, the REST API can do — with webhooks
+- **API-first**: everything the UI can do, the REST API can do (webhooks on the roadmap)
 - Full-text search (FTS5) with typo tolerance
 - Workspaces with roles (owner / editor / viewer)
 - **PWA** installable; native iOS/Android via Capacitor sharing 100% of the code
