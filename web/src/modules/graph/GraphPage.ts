@@ -81,9 +81,9 @@ export class GraphPage extends NixComponent {
 
   private build(): void {
     const docs = localDocs.value.filter((d) => d.workspaceId === activeWs.value);
-    if (!docs.length) return;
     this.measure();
     const { width, height } = this.rect;
+    if (width === 0 || height === 0) return; // canvas aún sin medir
     const existing = new Map(this.nodes.map((n) => [n.id, n]));
     this.nodes = docs.map((d, i) => {
       const prev = existing.get(d.id);
@@ -222,7 +222,7 @@ export class GraphPage extends NixComponent {
         const a = nodes.find((n) => n.id === e.from);
         const b = nodes.find((n) => n.id === e.to);
         if (!a || !b) continue;
-        ctx.strokeStyle = "rgba(99, 102, 241, 0.35)";
+        ctx.strokeStyle = "rgba(0, 180, 216, 0.3)";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
@@ -231,23 +231,31 @@ export class GraphPage extends NixComponent {
       }
       for (const n of nodes) {
         const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 32);
-        grad.addColorStop(0, "rgba(99, 102, 241, 0.18)");
-        grad.addColorStop(1, "rgba(99, 102, 241, 0)");
+        grad.addColorStop(0, "rgba(0, 180, 216, 0.12)");
+        grad.addColorStop(1, "rgba(0, 180, 216, 0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(n.x, n.y, 32, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#161922";
-        ctx.strokeStyle = "#6366f1";
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#00b4d8";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(n.x, n.y, 8, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#e6e8ee";
+        ctx.fillStyle = "#1b2a4a";
         ctx.font = "500 12px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(n.title, n.x, n.y + 24);
+      }
+
+      // hint cuando no hay nodos (docs sin cargar o workspace vacío)
+      if (nodes.length === 0) {
+        ctx.fillStyle = "#8496b3";
+        ctx.font = "400 14px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Crea documentos con [[wikilinks]] para ver el grafo", width / 2, height / 2);
       }
     };
 
