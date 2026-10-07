@@ -159,5 +159,6 @@ export async function quickAddLocal(text: string): Promise<LocalTask | null> {
     blockedBy: created.blockedBy,
     depth: created.depth,
     parentLine: created.parentLine,
+    tags: created.tags,
   };
 }

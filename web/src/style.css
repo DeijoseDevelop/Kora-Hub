@@ -3025,3 +3025,113 @@ kbd {
   color: var(--text-faint);
   font-size: var(--t-sm);
 }
+
+/* Table of Contents */
+.toc-panel {
+  margin-top: var(--s-4);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  background: var(--bg-soft);
+  padding: var(--s-3) var(--s-4);
+}
+
+.toc-panel h4 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--t-base);
+}
+
+.toc-item {
+  display: block;
+  padding: 3px var(--s-2);
+  border-radius: var(--r-sm);
+  font-size: var(--t-sm);
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: background var(--fast), color var(--fast);
+  border-left: 2px solid transparent;
+}
+
+.toc-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-left-color: var(--accent);
+}
+
+.toc-h1 { font-weight: 600; color: var(--text); }
+.toc-h2 { padding-left: var(--s-4); }
+.toc-h3 { padding-left: var(--s-8); }
+.toc-h4 { padding-left: 36px; font-size: var(--t-caption); }
+
+/* Print / PDF export */
+@media print {
+  .sidebar, .topbar, .doc-actions, .palette-backdrop, .qs-overlay,
+  .toast, .modal-backdrop, .theme-toggle, .cmd-btn, .sync-indicator,
+  .view-switcher, .menu-toggle, .comment-input-row, .doc-editor {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: block;
+    height: auto;
+  }
+
+  .main, .content, .router-view, .page {
+    display: block;
+    overflow: visible;
+    height: auto;
+  }
+
+  .doc-split {
+    display: block;
+  }
+
+  .doc-preview {
+    padding: 0;
+    overflow: visible;
+  }
+
+  .doc-preview h1 { font-size: 24px; }
+  .doc-preview h2 { font-size: 18px; }
+  .doc-preview h3 { font-size: 15px; }
+
+  .task-line, .callout, .toc-panel, .comments-panel {
+    break-inside: avoid;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 12pt;
+  }
+}
+
+/* Cycle progress */
+.cycle-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 120px;
+}
+
+.cycle-progress-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-soft);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+}
+
+.cycle-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--r-full);
+  transition: width var(--med) var(--ease);
+}
+
+.cycle-progress-text {
+  font-size: var(--t-caption);
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

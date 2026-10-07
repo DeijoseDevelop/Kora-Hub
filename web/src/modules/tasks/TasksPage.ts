@@ -284,6 +284,16 @@ function kanbanView(): ElurTemplate {
         <button class="quick-add-btn" @click=${() => void quickAdd()}>${() => tr("tasks.add")}</button>
       </div>
       <span class="quick-add-hint">${() => tr("tasks.quick_hint")}</span>
+      <select class="group-select" value=${() => cycleFilter.value}
+        @change=${(ev: Event) => (cycleFilter.value = (ev.target as HTMLSelectElement).value)}>
+        <option value="">${() => tr("tasks.all_cycles")}</option>
+        ${() => cycles().map((c) => html`<option value=${c}>${"🔄 " + c}</option>`)}
+      </select>
+      ${() => cycleFilter.value ? html`
+        <div class="cycle-progress">
+          <div class="cycle-progress-bar"><div class="cycle-progress-fill" style=${"width:" + Math.round((cycleProgress().done / Math.max(1, cycleProgress().total)) * 100) + "%"}></div></div>
+          <span class="cycle-progress-text">${cycleProgress().done}/${cycleProgress().total} ${() => tr("tasks.cycle_done")}</span>
+        </div>` : ""}
       <select class="group-select" value=${() => groupBy.value}
         @change=${(ev: Event) => (groupBy.value = (ev.target as HTMLSelectElement).value as typeof groupBy.value)}>
         <option value="">${() => tr("tasks.group_none")}</option>
@@ -294,7 +304,7 @@ function kanbanView(): ElurTemplate {
     </div>
     ${() => {
       const ws = activeWs.value;
-      const all = localTasks.value.filter((t) => t.workspaceId === ws);
+      const all = tasksInCycle();
       const gb = groupBy.value;
       if (!gb) {
         return html`<div class="kanban-board">
@@ -331,6 +341,36 @@ const tableSort = signal<{ col: string; dir: 1 | -1 }>({ col: "dueDate", dir: 1 
 const selectedIds = signal<Set<string>>(new Set());
 const groupBy = signal<"" | "project" | "assignee" | "priority">("");
 const editingCell = signal<{ id: string; field: string } | null>(null);
+const cycleFilter = signal<string>("");
+
+// cycles extrae los nombres de ciclo de las tags de las tareas (+cycle:X)
+function cycles(): string[] {
+  const set = new Set<string>();
+  for (const t of localTasks.value) {
+    if (t.workspaceId !== activeWs.value) continue;
+    for (const tag of t.tags ?? []) {
+      if (tag.startsWith("cycle:")) set.add(tag.slice(6));
+    }
+  }
+  return [...set].sort();
+}
+
+// tasksInCycle filtra por ciclo seleccionado (vacío = todos)
+function tasksInCycle(): LocalTask[] {
+  const ws = activeWs.value;
+  const c = cycleFilter.value;
+  return localTasks.value.filter((t) => {
+    if (t.workspaceId !== ws) return false;
+    if (c && !(t.tags ?? []).includes("cycle:" + c)) return false;
+    return true;
+  });
+}
+
+// cycleProgress devuelve {done, total} de las tareas del ciclo activo
+function cycleProgress(): { done: number; total: number } {
+  const all = tasksInCycle();
+  return { done: all.filter((t) => t.done).length, total: all.length };
+}
 
 function tablaView(): ElurTemplate {
   const filtered = () => {

@@ -26,6 +26,7 @@ export class DocEditorPage extends ElurComponent {
   private share = signal<ShareState | undefined>(undefined);
   private comments = signal<Comment[] | null>(null);
   private commentText = "";
+  private toc = signal<{ id: string; text: string; level: number }[] | null>(null);
 
   onMount(): void {
     const id = router.params.value.id ?? "";
@@ -59,6 +60,8 @@ export class DocEditorPage extends ElurComponent {
             <button class="btn ghost" id="toggle-versions" @click=${() => void this.toggleVersions()}>${() => t("editor.history")}</button>
             <button class="btn ghost" id="toggle-comments" @click=${() => void this.toggleComments()}>${() => t("editor.comments")} <span class="comment-count">${() => this.comments.value?.length ?? 0}</span></button>
             <button class="btn ghost" id="toggle-share" @click=${() => void this.toggleShare()}>${() => t("editor.share")}</button>
+            <button class="btn ghost" id="toggle-toc" @click=${() => void this.toggleToc()}>${() => t("editor.toc")}</button>
+            <button class="btn ghost" id="print-doc" @click=${() => window.print()}>${() => t("editor.print")}</button>
             <button class="btn" @click=${() => this.save()}>${() => t("editor.save")}</button>
           </div>
         </div>
@@ -124,6 +127,17 @@ export class DocEditorPage extends ElurComponent {
             </div>
           </div>
         ` : ""}
+        ${() => this.toc.value !== null && (this.toc.value ?? []).length > 0 ? html`
+          <div class="toc-panel">
+            <h4>${() => t("editor.toc")}</h4>
+            ${(this.toc.value ?? []).map((h) => html`
+              <a class=${"toc-item toc-h" + h.level} href=${"#" + h.id}
+                @click=${(ev: Event) => {
+                  ev.preventDefault();
+                  document.getElementById(h.id)?.scrollIntoView({ behavior: "smooth" });
+                }}>${h.text}</a>`)}
+          </div>
+        ` : ""}
         ${() => this.backlinks.value !== null && this.backlinks.value!.length > 0 ? html`
           <div class="backlinks-panel">
             <h4>${() => t("editor.backlinks")}</h4>
@@ -153,6 +167,24 @@ export class DocEditorPage extends ElurComponent {
       showToast((e as Error).message);
       return null;
     }
+  }
+
+  private toggleToc(): void {
+    if (this.toc.value !== null) {
+      this.toc.value = null;
+      return;
+    }
+    const preview = this.previewRef.el;
+    if (!preview) return;
+    const headings = Array.from(preview.querySelectorAll("h1, h2, h3, h4"));
+    headings.forEach((h, i) => {
+      if (!h.id) h.id = `toc-${i}`;
+    });
+    this.toc.value = headings.map((h) => ({
+      id: h.id,
+      text: h.textContent ?? "",
+      level: parseInt(h.tagName[1]),
+    }));
   }
 
   private async toggleComments(): Promise<void> {
