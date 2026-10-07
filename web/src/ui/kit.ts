@@ -49,19 +49,6 @@ export function formatDate(dateStr: string): string {
 // cerca de medianoche).
 export { resolveDateISO } from "../tasks/parser";
 
-export function badgeDate(dateStr: string): string {
-  const overdue = isOverdue(dateStr);
-  return `<span class="badge date ${overdue ? "overdue" : ""}">${formatDate(dateStr)}</span>`;
-}
-
-export function badgeProject(p: string): string {
-  return `<span class="badge project">@${escapeHtml(p)}</span>`;
-}
-
-export function badgePriority(p: string): string {
-  return `<span class="badge priority-${escapeHtml(p)}">${escapeHtml(p)}</span>`;
-}
-
 // fuzzyMatch: subsecuencia de caracteres (estilo Raycast)
 export function fuzzyMatch(query: string, text: string): boolean {
   if (!query) return true;

@@ -7,7 +7,6 @@ import { activeWs } from "./workspace";
 // del mirror local; el servidor solo sincroniza. 100% offline.
 export const localDocs = signal<LocalDoc[]>([]);
 export const localTasks = signal<LocalTask[]>([]);
-export const localReady = signal(false);
 
 
 export async function refreshLocal(workspaceId?: string): Promise<void> {
@@ -24,7 +23,6 @@ export async function bootstrapLocal(workspaceId: string): Promise<void> {
   }
   await reindexAll();
   await refreshLocal(workspaceId);
-  localReady.value = true;
 }
 
 // initLocal: reacciona a cambios locales (crear/editar docs) con un

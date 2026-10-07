@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Deijose <tech@deijose.dev>
 // SPDX-License-Identifier: AGPL-3.0-only
-import { applyChanges, getCursor, mirrorDoc, type Change } from "./local";
-import { enqueue, queueDB, type QueuedCommand } from "./queue";
+import { applyChanges, getCursor, type Change } from "./local";
+import { queueDB, type QueuedCommand } from "./queue";
 import { apiFetch, getToken } from "../api/client";
 import { activeWs } from "../data/workspace";
 import { showToast } from "../ui/kit";
@@ -13,10 +13,6 @@ import { t } from "../i18n";
 
 let inFlight = false;
 let dirty = false;
-
-export function syncStatus(): { online: boolean; pending: number } {
-  return { online: navigator.onLine, pending: 0 };
-}
 
 // pushPending envía la cola de comandos al servidor y aplica el delta
 // resultante. Si llega un comando durante un push en vuelo (dirty), se
@@ -84,20 +80,6 @@ export async function pull(workspaceId: string): Promise<void> {
   if (delta) {
     await applyChanges(delta.changes ?? [], delta.cursor ?? since, workspaceId);
   }
-}
-
-// queueDocUpdate registra una edición offline: actualiza el mirror y
-// encola el comando doc.upsert con su idempotency-key.
-export async function queueDocUpdate(doc: {
-  id: string; path: string; title: string; content: string; updatedAt: string;
-}): Promise<void> {
-  const key = crypto.randomUUID();
-  await mirrorDoc({ ...doc, contentHash: await sha256(doc.content), workspaceId: activeWs.value ?? "" });
-  await enqueue({
-    key: "doc.upsert",
-    payload: { idempotency_key: key, op: "doc.upsert", doc_id: doc.id, path: doc.path, content: doc.content, updated_at: doc.updatedAt },
-    idempotencyKey: key,
-  });
 }
 
 async function queueCommands(): Promise<QueuedCommand[]> {

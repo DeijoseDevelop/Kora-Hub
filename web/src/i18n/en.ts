@@ -61,6 +61,7 @@ export const en: Record<string, string> = {
   "tasks.quick_ph": "Quick task: 'call the client tomorrow @sales !high'",
   "tasks.add": "Add",
   "tasks.quick_hint": "Enter to create · #date @project !priority",
+  "tasks.col_empty": "Drag here",
   "tasks.drag_hint": "Drag a card to change its state · The change rewrites the source Markdown (round-trip)",
   "tasks.all_projects": "All projects",
   "tasks.pending": "Open",

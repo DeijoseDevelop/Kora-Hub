@@ -213,8 +213,12 @@ function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter
         if (cur !== state) void setTaskStateLocal(target, state);
       }
     }}>
-        ${() =>
-      getter().map((t) => html`
+        ${() => {
+      const items = getter();
+      if (items.length === 0) {
+        return html`<div class="kanban-empty">${() => tr("tasks.col_empty")}</div>`;
+      }
+      return items.map((t) => html`
             <div class=${"task-card" + (t.done ? " done" : "")} draggable="true"
               @dragstart=${(ev: DragEvent) => {
           (ev.currentTarget as HTMLElement).classList.add("dragging");
@@ -234,7 +238,8 @@ function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter
                   Ver
                 </span>
               </div>
-            </div>`)}
+            </div>`);
+    }}
       </div>
     </div>
   `;

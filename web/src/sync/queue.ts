@@ -35,13 +35,6 @@ export async function enqueue(cmd: Omit<QueuedCommand, "id" | "createdAt" | "att
   });
 }
 
-export async function dequeue(): Promise<QueuedCommand | undefined> {
-  const first = await queueDB.commands.orderBy("createdAt").first();
-  if (!first?.id) return undefined;
-  await queueDB.commands.delete(first.id);
-  return first;
-}
-
 export async function clearQueue(): Promise<void> {
   await queueDB.commands.clear();
 }

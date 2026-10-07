@@ -3,7 +3,74 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
+
+// Theme claro del design system v3: superficies neutras, un solo acento
+// cian, tipografía mono para el cuerpo. Sustituye a oneDark (oscuro)
+// que era inconsistente con el resto de la UI clara.
+const koraLight = EditorView.theme({
+  "&": {
+    backgroundColor: "var(--bg)",
+    color: "var(--text)",
+    height: "100%",
+  },
+  ".cm-scroller": {
+    fontFamily: "var(--font-mono)",
+    lineHeight: "1.75",
+  },
+  ".cm-content": {
+    caretColor: "var(--accent)",
+    padding: "16px 0",
+  },
+  ".cm-cursor, .cm-dropCursor": {
+    borderLeftColor: "var(--accent)",
+    borderLeftWidth: "2px",
+  },
+  "&.cm-focused .cm-cursor": {
+    borderLeftColor: "var(--accent)",
+  },
+  ".cm-selectionBackground, ::selection": {
+    backgroundColor: "var(--accent-soft) !important",
+  },
+  "&.cm-focused .cm-selectionBackground": {
+    backgroundColor: "var(--accent-soft) !important",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "var(--bg-soft)",
+  },
+  ".cm-gutters": {
+    backgroundColor: "var(--bg)",
+    color: "var(--text-faint)",
+    borderRight: "1px solid var(--border-soft)",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "var(--bg-soft)",
+    color: "var(--text-dim)",
+  },
+  ".cm-foldPlaceholder": {
+    backgroundColor: "var(--bg-soft)",
+    border: "1px solid var(--border)",
+    color: "var(--text-dim)",
+  },
+});
+
+const koraHighlight = HighlightStyle.define([
+  { tag: t.heading1, color: "var(--n-800)", fontWeight: "700", fontSize: "1.35em" },
+  { tag: t.heading2, color: "var(--n-800)", fontWeight: "600", fontSize: "1.15em" },
+  { tag: t.heading3, color: "var(--n-700)", fontWeight: "600" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: t.strong, fontWeight: "700" },
+  { tag: t.strikethrough, textDecoration: "line-through" },
+  { tag: t.link, color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: "2px" },
+  { tag: t.url, color: "var(--accent-hover)" },
+  { tag: t.monospace, color: "var(--accent-hover)", fontFamily: "var(--font-mono)", fontSize: "0.92em" },
+  { tag: t.quote, color: "var(--text-dim)", fontStyle: "italic" },
+  { tag: t.list, color: "var(--text)" },
+  { tag: t.atom, color: "var(--accent)" },
+  { tag: t.meta, color: "var(--text-faint)" },
+  { tag: t.processingInstruction, color: "var(--text-faint)" },
+]);
 
 // Editor como NixComponent (sección 7.2): ref() al contenedor, instancia
 // de CodeMirror en onMount() y cleanup automático al desmontar. Sin
@@ -41,7 +108,8 @@ export class MarkdownEditor extends NixComponent {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         markdown(),
-        oneDark,
+        koraLight,
+        syntaxHighlighting(koraHighlight),
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {
