@@ -95,7 +95,7 @@ export class App extends ElurComponent {
       }
       if (ev.key === "?") {
         ev.preventDefault();
-        this.palette.toggle();
+        router.navigate("/help");
         return;
       }
     };
@@ -275,6 +275,14 @@ export class App extends ElurComponent {
             }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
                     ${() => t("app.new_doc")}
+                  </button>
+                  <button class="help-btn" @click=${() => {
+              this.sidebarOpen.value = false;
+              router.navigate("/help");
+            }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    ${() => t("app.help")}
+                    <kbd>?</kbd>
                   </button>
                 `
           : html`<div class="sidebar-spacer"></div>`}
