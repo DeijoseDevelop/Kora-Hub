@@ -37,6 +37,27 @@ export interface SearchResult {
 const TOKEN_KEY = "hub:token";
 const REFRESH_KEY = "hub:refresh";
 const EXPIRES_KEY = "hub:expires";
+const LOCAL_MODE_KEY = "hub:local-mode";
+
+// Modo local: la app funciona 100% offline sin servidor (filosofía
+// P1: archivos son la verdad). La autenticación solo se necesita para
+// sync multi-dispositivo. En web servido por Go el servidor YA está
+// (mismo origen); en nativo sin URL → modo local.
+export function isLocalMode(): boolean {
+  return localStorage.getItem(LOCAL_MODE_KEY) === "1" ||
+    (isNative() && !getApiBase());
+}
+
+export function startLocalSession(): void {
+  localStorage.setItem(LOCAL_MODE_KEY, "1");
+  // token sintético que satisface el guard del router
+  localStorage.setItem(TOKEN_KEY, "local-session");
+  window.dispatchEvent(new CustomEvent("hub:login"));
+}
+
+export function isLocalSession(): boolean {
+  return getToken() === "local-session";
+}
 
 // API base URL: en web/PWA las URLs relativas van al mismo origen. En
 // Capacitor (Android/iOS) la app corre desde capacitor://localhost —
@@ -95,6 +116,14 @@ async function safeJSON<T>(res: Response): Promise<T> {
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
+}
+
+// ensureSession: si no hay token y estamos en modo local, crear sesión
+// local automáticamente (offline-first: nunca se exige servidor).
+export function ensureSession(): void {
+  if (!getToken() && isLocalMode()) {
+    startLocalSession();
+  }
 }
 
 export function getRefreshToken(): string | null {
@@ -156,7 +185,13 @@ export function refreshSession(): Promise<boolean> {
 
 // apiFetch es el helper autenticado: ante 401 renueva el token (una vez)
 // y reintenta; si el refresh falla, limpia la sesión y emite hub:logout.
+// En modo local (sin servidor), las llamadas al servidor fallan
+// elegantemente — el mirror local es la fuente de datos.
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (isLocalSession()) {
+    // sin servidor: el mirror local ya tiene los datos; no se llama a la API
+    throw new Error("offline");
+  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(init.headers as Record<string, string>),

@@ -1,5 +1,5 @@
 import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
-import { authApi, getToken, setSession, getApiBase, setApiBase, needsServerUrl } from "../../api/client";
+import { authApi, getToken, setSession, getApiBase, setApiBase, needsServerUrl, isLocalMode, startLocalSession } from "../../api/client";
 import { router } from "../../router";
 import { showToast } from "../../ui/kit";
 import { t } from "../../i18n";
@@ -26,28 +26,36 @@ export class HomePage extends ElurComponent {
       router.navigate("/docs");
       return;
     }
+    // modo local: la app funciona sin servidor (offline-first)
+    if (isLocalMode()) {
+      startLocalSession();
+      router.navigate("/docs");
+      return;
+    }
     void authApi.status().then(({ has_users }) => {
       if (!has_users) this.mode.value = "register";
-    }).catch((e: Error) => {
-      // en nativo sin URL configurada, avisar de forma clara
-      if (isNative() && needsServerUrl()) {
-        showToast(t("auth.server_required"));
-      }
+    }).catch(() => {
+      // si el servidor no responde, caer a modo local
+      startLocalSession();
+      router.navigate("/docs");
     });
   }
 
   private submit(): void {
     if (isNative()) {
       const url = this.serverUrl.value.trim();
-      if (!url) {
-        showToast(t("auth.server_required"));
+      if (url) {
+        if (!/^https?:\/\/.+/.test(url)) {
+          showToast(t("auth.server_invalid"));
+          return;
+        }
+        setApiBase(url);
+      } else {
+        // sin URL → modo local (offline-first)
+        startLocalSession();
+        router.navigate("/docs");
         return;
       }
-      if (!/^https?:\/\/.+/.test(url)) {
-        showToast(t("auth.server_invalid"));
-        return;
-      }
-      setApiBase(url);
     }
     if (this.password.value.length < 8) {
       showToast(t("auth.pw_short"));
@@ -89,6 +97,12 @@ export class HomePage extends ElurComponent {
                   @input=${(ev: Event) => (this.serverUrl.value = (ev.target as HTMLInputElement).value)} />
                 <p class="login-hint" style="margin:4px 0 0;font-size:11px">${() => t("auth.server_hint")}</p>
               </div>` : ""}
+            ${() => isNative() && !this.serverUrl.value.trim() ? html`
+              <button type="button" class="btn ghost" style="width:100%;margin:8px 0"
+                @click=${() => { startLocalSession(); router.navigate("/docs"); }}>
+                ${() => t("auth.offline_mode")}
+              </button>
+            ` : ""}
             ${() =>
         this.mode.value === "register"
           ? html`

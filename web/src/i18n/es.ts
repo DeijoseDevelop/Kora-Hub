@@ -112,9 +112,10 @@ export const es: Record<string, string> = {
   "auth.logged_in": "Sesión iniciada",
   "auth.hint": 'Datos 100% locales y offline-first. Al crear tu cuenta se configura tu workspace "Personal" automáticamente.',
   "auth.server_ph": "URL del servidor (ej: http://192.168.1.10:8080)",
-  "auth.server_hint": "En la app nativa, indica la URL de tu servidor Kora Hub",
+  "auth.server_hint": "El servidor es opcional — solo para sync multi-dispositivo. Sin URL, la app funciona 100% offline.",
   "auth.server_required": "Configura la URL del servidor para continuar",
   "auth.server_invalid": "La URL debe empezar por http:// o https://",
+  "auth.offline_mode": "Continuar sin conexión",
 
   // Ajustes
   "settings.title": "Ajustes",

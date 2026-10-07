@@ -28,8 +28,9 @@ export const router = createRouter(routes, { mode: "hash" });
 
 // Guardia: las rutas internas requieren sesión (defensa en profundidad
 // además del gate visual del shell).
-import { getToken } from "./api/client";
+import { getToken, ensureSession } from "./api/client";
 router.beforeEach((to) => {
+  ensureSession(); // modo local: sesión automática sin servidor
   const match = router.resolve(to);
   if (match?.route?.meta?.auth && !getToken()) {
     return "/";
