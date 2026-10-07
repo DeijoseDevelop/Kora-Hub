@@ -14,5 +14,15 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? "http://127.0.0.1:8099",
     locale: "es-ES",
   },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+        // Chrome del sistema: no siempre están los browsers de Playwright
+        // cacheados en local; en CI se usa el binario de Playwright.
+        ...(process.env.CHROME_BIN ? { launchOptions: { executablePath: process.env.CHROME_BIN } } : {}),
+      },
+    },
+  ],
 });
