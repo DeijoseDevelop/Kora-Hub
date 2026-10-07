@@ -90,9 +90,9 @@ export class SearchPage extends ElurComponent {
             snippet: "",
           }),
         );
-        const seen = new Set(hits.map((h) => h.kind + ":" + h.title + ":" + h.sub));
+        const seen = new Set(hits.map((h) => h.kind + ":" + h.title));
         for (const h of remote) {
-          const key = h.kind + ":" + h.title + ":" + h.sub;
+          const key = h.kind + ":" + h.title;
           if (!seen.has(key)) {
             seen.add(key);
             hits.push(h);
