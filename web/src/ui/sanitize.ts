@@ -11,6 +11,7 @@ const ALLOWED_TAGS = new Set([
   "HR", "I", "IMG", "INPUT", "INS", "KBD", "LI", "MARK", "OL", "P", "PRE", "Q",
   "S", "SAMP", "SECTION", "SMALL", "SPAN", "STRONG", "SUB", "SUMMARY", "SUP",
   "TABLE", "TBODY", "TD", "TFOOT", "TH", "THEAD", "TR", "U", "UL", "VAR",
+  "IFRAME", "AUDIO", "VIDEO", "SOURCE",
 ]);
 
 const ALLOWED_ATTR: Record<string, Set<string>> = {
@@ -35,13 +36,24 @@ const ALLOWED_ATTR: Record<string, Set<string>> = {
   LI: new Set(["class"]),
   UL: new Set(["class"]),
   SECTION: new Set(["class"]),
+  IFRAME: new Set(["src", "width", "height", "allowfullscreen", "loading", "title"]),
+  AUDIO: new Set(["src", "controls", "preload"]),
+  VIDEO: new Set(["src", "controls", "preload", "width", "height", "poster"]),
+  SOURCE: new Set(["src", "type"]),
 };
 
 const URL_ATTRS = new Set(["href", "src"]);
 
+// dominios seguros para iframes (embeds de video/audio)
+const SAFE_EMBED_HOSTS = new Set([
+  "youtube.com", "www.youtube.com", "youtu.be", "player.vimeo.com",
+  "vimeo.com", "www.youtube-nocookie.com", "open.spotify.com",
+  "w.soundcloud.com", "player.twitch.tv", "embed.music.apple.com",
+]);
+
 // estas etiquetas se eliminan con todo su contenido (texto incluido):
 // su texto es activo (JS/CSS) y no debe sobrevivir al deshijar
-const DROP_CONTENT = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "IFRAME", "OBJECT", "EMBED", "SVG", "MATH"]);
+const DROP_CONTENT = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "OBJECT", "EMBED", "SVG", "MATH"]);
 
 function safeURL(raw: string): string | null {
   const v = raw.trim().replace(/[\u0000-\u001f\u007f]/g, "").toLowerCase();
@@ -49,6 +61,15 @@ function safeURL(raw: string): string | null {
     return null;
   }
   return raw;
+}
+
+function safeEmbedSrc(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && SAFE_EMBED_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function scrub(el: Element): void {
@@ -87,6 +108,19 @@ function scrub(el: Element): void {
     const type = (el.getAttribute("type") ?? "").toLowerCase();
     if (type !== "checkbox") el.removeAttribute("type");
     el.setAttribute("disabled", "");
+  }
+  if (tag === "IFRAME") {
+    const src = el.getAttribute("src") ?? "";
+    if (!safeEmbedSrc(src)) {
+      el.remove();
+      return;
+    }
+  }
+  if (tag === "AUDIO" || tag === "VIDEO") {
+    const src = el.getAttribute("src") ?? "";
+    if (src && !safeURL(src)) {
+      el.removeAttribute("src");
+    }
   }
   for (const child of Array.from(el.children)) scrub(child);
 }

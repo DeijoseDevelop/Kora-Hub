@@ -70,3 +70,21 @@ describe("sanitizeHTML", () => {
     expect(out).not.toContain("position:fixed");
   });
 });
+
+  test("permite iframes de dominios seguros (embeds)", () => {
+    const out = sanitizeHTML(`<iframe src="https://www.youtube.com/embed/abc" width="560"></iframe>`);
+    expect(out).toContain("youtube.com");
+    expect(out).toContain("iframe");
+  });
+
+  test("bloquea iframes de dominios no seguros", () => {
+    const out = sanitizeHTML(`<iframe src="https://evil.com/hack"></iframe>`);
+    expect(out).not.toContain("iframe");
+    expect(out).not.toContain("evil.com");
+  });
+
+  test("audio/video con src seguro se conservan", () => {
+    const out = sanitizeHTML(`<audio controls src="https://example.com/track.mp3"></audio>`);
+    expect(out).toContain("audio");
+    expect(out).toContain("controls");
+  });

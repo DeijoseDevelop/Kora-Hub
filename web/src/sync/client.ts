@@ -54,6 +54,8 @@ async function pushOnce(): Promise<void> {
     );
     await applyChanges(delta.changes ?? [], delta.cursor ?? (await getCursor(ws ?? undefined)), ws ?? "");
     await queueDB.commands.bulkDelete(pending.map((c) => c.id!));
+    // notificar sync exitoso (solo si hubo comandos)
+    window.dispatchEvent(new CustomEvent("hub:sync-done", { detail: { count: pending.length } }));
   } catch (e) {
     // 403 = sin permiso tras refresh válido: se descarta la cola (el
     // servidor decidió) y se avisa. 401/transitorio: la cola se

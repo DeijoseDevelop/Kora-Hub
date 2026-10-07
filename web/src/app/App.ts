@@ -116,6 +116,8 @@ export class App extends ElurComponent {
     window.addEventListener("hub:open-doc", onOpenDoc);
     window.addEventListener("hub:login", onAuthChange);
     window.addEventListener("hub:logout", onAuthChange);
+    window.addEventListener("hub:docs-changed", () => void refresh());
+    window.addEventListener("hub:sync-done", () => void refresh());
     void refresh();
     void this.bootstrap();
     return () => {
@@ -123,6 +125,8 @@ export class App extends ElurComponent {
       window.removeEventListener("hub:open-doc", onOpenDoc);
       window.removeEventListener("hub:login", onAuthChange);
       window.removeEventListener("hub:logout", onAuthChange);
+      window.removeEventListener("hub:docs-changed", refresh);
+      window.removeEventListener("hub:sync-done", refresh);
       window.removeEventListener("online", refresh);
       window.removeEventListener("offline", refresh);
     };

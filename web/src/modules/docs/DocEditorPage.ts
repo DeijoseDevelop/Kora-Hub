@@ -3,7 +3,7 @@ import { marked } from "marked";
 import { router } from "../../router";
 import { getLocalDocById, saveDocLocal } from "../../data/mutations";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { parseLine } from "../../tasks/parser";
+import { parse, parseLine } from "../../tasks/parser";
 import { escapeHtml, formatDate, isOverdue, showToast } from "../../ui/kit";
 import { sanitizeHTML } from "../../ui/sanitize";
 import { attachmentsApi, commentsApi, docsApi, sharesApi, type Backlink, type Comment, type DocVersion, type ShareState } from "../../api/client";
@@ -62,6 +62,8 @@ export class DocEditorPage extends ElurComponent {
             <button class="btn ghost" id="toggle-share" @click=${() => void this.toggleShare()}>${() => t("editor.share")}</button>
             <button class="btn ghost" id="toggle-toc" @click=${() => void this.toggleToc()}>${() => t("editor.toc")}</button>
             <button class="btn ghost" id="print-doc" @click=${() => window.print()}>${() => t("editor.print")}</button>
+            <button class="btn ghost" id="export-html" @click=${() => this.exportHTML()}>${() => t("editor.export_html")}</button>
+            <button class="btn ghost" id="export-ics" @click=${() => this.exportICS()}>${() => t("editor.export_ics")}</button>
             <button class="btn" @click=${() => this.save()}>${() => t("editor.save")}</button>
           </div>
         </div>
@@ -167,6 +169,96 @@ export class DocEditorPage extends ElurComponent {
       showToast((e as Error).message);
       return null;
     }
+  }
+
+  // exportHTML descarga el preview como archivo HTML autocontenido.
+  private exportHTML(): void {
+    const preview = this.previewRef.el;
+    if (!preview) return;
+    const title = this.current?.title ?? "documento";
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)} — Kora Hub</title>
+<style>
+body { font-family: Inter, system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1b2a4a; line-height: 1.7; }
+h1, h2, h3 { font-family: Poppins, Inter, sans-serif; letter-spacing: -0.02em; }
+h1 { font-size: 24px; } h2 { font-size: 19px; } h3 { font-size: 15px; }
+code { background: #f0f2f5; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+pre { background: #f0f2f5; padding: 14px; border-radius: 10px; overflow-x: auto; border: 1px solid #e3e9f0; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 3px solid #00b4d8; padding-left: 14px; color: #46597a; margin: 12px 0; }
+.badge { font-size: 10.5px; padding: 2px 7px; border-radius: 99px; font-weight: 500; display: inline-block; }
+.badge.date { background: #e0f2fe; color: #0284c7; }
+.badge.project { background: #f0f2f5; color: #46597a; }
+.badge.priority-alta { background: #fee2e2; color: #dc2626; }
+.badge.priority-media { background: #fef3c7; color: #d97706; }
+.badge.priority-baja { background: #dcfce7; color: #16a34a; }
+.task-line { display: flex; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #f8f9fa; margin: 6px 0; border: 1px solid #e3e9f0; }
+.task-line.done { opacity: 0.55; text-decoration: line-through; }
+.task-checkbox { width: 16px; height: 16px; border: 1.5px solid #8496b3; border-radius: 4px; flex-shrink: 0; margin-top: 2px; }
+.task-checkbox.checked { background: #00b4d8; border-color: #00b4d8; }
+.task-body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.task-badges { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.callout { margin: 12px 0; padding: 12px 16px; border-radius: 10px; border-left: 3px solid #00b4d8; background: #f0f2f5; }
+.callout-header { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.callout-body { font-size: 13px; color: #46597a; }
+.callout-note { border-left-color: #3b82f6; background: #eff6ff; }
+.callout-tip { border-left-color: #18a058; background: #f0fdf4; }
+.callout-warning { border-left-color: #d97706; background: #fffbeb; }
+.callout-danger { border-left-color: #e5484d; background: #fef2f2; }
+img { max-width: 100%; border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #e3e9f0; padding: 8px 12px; text-align: left; }
+th { background: #f8f9fa; }
+</style>
+</head>
+<body>
+${preview.innerHTML}
+</body>
+</html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // exportICS genera un archivo .ics con las tareas que tienen fecha.
+  private exportICS(): void {
+    const doc = this.current;
+    if (!doc) return;
+    const content = this.editor.getDoc();
+    const tasks = parse(content).filter((t) => t.dueDate);
+    if (tasks.length === 0) {
+      showToast(t("editor.no_dated_tasks"));
+      return;
+    }
+    const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    let ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kora Hub//ES\r\n`;
+    for (const task of tasks) {
+      const d = task.dueDate!.replace(/-/g, "");
+      ics += `BEGIN:VEVENT\r\n`;
+      ics += `UID:${crypto.randomUUID()}@kora-hub\r\n`;
+      ics += `DTSTAMP:${now}\r\n`;
+      ics += `DTSTART;VALUE=DATE:${d}\r\n`;
+      ics += `SUMMARY:${task.title.replace(/\n/g, " ")}\r\n`;
+      if (task.project) ics += `CATEGORIES:${task.project}\r\n`;
+      if (task.assignee) ics += `ATTENDEE:${task.assignee}\r\n`;
+      ics += `DESCRIPTION:${(task.priority ? "[!" + task.priority + "] " : "")}${task.title.replace(/\n/g, " ")}\r\n`;
+      ics += `END:VEVENT\r\n`;
+    }
+    ics += `END:VCALENDAR\r\n`;
+    const blob = new Blob([ics], { type: "text/calendar" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${doc.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast(t("editor.ics_exported", { count: tasks.length }));
   }
 
   private toggleToc(): void {
