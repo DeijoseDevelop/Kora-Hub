@@ -20,15 +20,26 @@ let api: APIRequestContext;
 test.beforeAll(async ({ request: req }) => {
   baseURL = test.info().project.use.baseURL as string;
   api = await request.newContext({ baseURL });
-  const res = await api.post("/api/v1/auth/register", {
-    data: {
-      email: `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@kora.test`,
-      password: PASSWORD,
-      display_name: "E2E User",
-    },
-  });
-  expect(res.ok()).toBeTruthy();
-  session = await res.json();
+  // rate limit: 5/min por IP en /auth/register. Reintenta con backoff
+  // si el servidor devuelve 429 (corridas seguidas en local).
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await api.post("/api/v1/auth/register", {
+      data: {
+        email: `e2e-${Date.now()}-${Math.floor(Math.random() * 1e6)}@kora.test`,
+        password: PASSWORD,
+        display_name: "E2E User",
+      },
+    });
+    if (res.ok()) {
+      session = await res.json();
+      return;
+    }
+    if (res.status() === 429 && attempt < 4) {
+      await new Promise((r) => setTimeout(r, 15_000));
+      continue;
+    }
+    throw new Error(`register fallo: ${res.status()} ${await res.text()}`);
+  }
 });
 
 // injectSession deja la sesión activa antes de que cargue el bundle.
