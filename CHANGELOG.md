@@ -26,6 +26,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
   de tareas `[x]`/`[~]`, kanban por columna, XSS, búsqueda, command
   palette con teclado, path traversal, token typ, FTS con comillas,
   i18n.
+- **Design System v3**: tokens 2-tier (primitivos oklch + semánticos),
+  escala de espaciado base-4, tipografía Major Third 1.25, profundidad
+  plana (bordes > sombras), focus-ring consistente, `prefers-reduced-motion`.
+- **CodeMirror theme claro** (`koraLight` + `koraHighlight`): sustituye
+  a `oneDark` (oscuro en UI clara) con los colores del DS v3.
+- **Empty states**: icono SVG inline en `.empty-state`, hint "Arrastra
+  aquí" en columnas kanban vacías.
+- **Command palette mejorado**: "Nuevo documento" abre el flujo completo
+  (prompt → plantilla → crear → navegar); nuevas acciones "Ir a Búsqueda"
+  e "Ir a Ajustes".
+- **Estilos de búsqueda**: `.search-hit`, `.badge.doc/task`, snippets,
+  `.search-box` (antes no existían).
 
 ### Fixed
 
@@ -100,6 +112,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 - **`handlePatchTask` reescribía la línea equivocada** si el archivo
   cambió desde el índice: ahora `resolveTaskLine` re-resuelve por `^id:`
   y por título antes de mutar.
+- **Quick-add duplicaba el checkbox** si el texto ya lo traía
+  (`"− [x] algo"` → `"− [ ] − [x] algo"`). `LooksLikeTask` (Go+TS)
+  detecta checkbox existente y no lo duplica.
 - **`handleLogin` enmascaraba errores de BD como credenciales inválidas**
   (la rama 500 era inalcanzable).
 - **README/docs prometían webhooks** que están en P3: se ajustó el texto
@@ -112,10 +127,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 - `applyTaskState(content, task, done)` → `applyTaskState(content, task, state)`.
 - `patchTaskRequest.Done` es ahora `*bool` (distingue ausente de false).
 - Nueva función `setTaskStateLocal` en el data layer (kanban por columna).
-- `syncStatus()` sigue como stub pero `pushPending` notifica `dirty`.
 - Nuevas claves i18n: `search.*` (ph, all, docs, tasks, empty, searching),
-  `sync.rejected`, `app.nav.search`.
+  `sync.rejected`, `app.nav.search`, `tasks.col_empty`,
+  `palette.goto_search/search_sub/goto_settings/settings_sub`.
+- **Código muerto eliminado** (DoD: sin dead code): `syncStatus`,
+  `queueDocUpdate`, `dequeue`, `localReady`, `badgeDate/Project/Priority`.
 - `docs/ARCHITECTURE.md`: se quitó "webhooks" del diagrama (P3).
+- CSS: design system v3 (tokens 2-tier, escala 4px, oklch, flat depth,
+  `prefers-reduced-motion`); CodeMirror `oneDark` → `koraLight`.
 
 ### Fixed
 

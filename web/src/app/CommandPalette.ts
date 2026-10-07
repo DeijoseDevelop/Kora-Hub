@@ -72,9 +72,36 @@ export class CommandPalette extends NixComponent {
           });
         },
       },
-      { kind: "action", label: t("palette.new_doc"), sub: t("palette.create_in_ws"), action: () => router.navigate("/docs") },
+      {
+        kind: "action",
+        label: t("palette.new_doc"),
+        sub: t("palette.create_in_ws"),
+        action: () => {
+          void showPrompt(t("docs.new_title"), t("docs.new_ph")).then((title) => {
+            if (!title) return;
+            void import("../data/templates").then(({ DOC_TEMPLATES }) => {
+              void import("../ui/kit").then(({ showSelect }) => {
+                void showSelect(
+                  t("docs.template"),
+                  DOC_TEMPLATES.map((tpl) => ({ value: tpl.id, label: tpl.id, description: tpl.id })),
+                ).then((tplId) => {
+                  const tpl = DOC_TEMPLATES.find((x) => x.id === tplId) ?? DOC_TEMPLATES[0];
+                  const path = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
+                  void import("../data/mutations").then(({ createDocLocal }) => {
+                    createDocLocal(title, path, tpl.skeleton(title))
+                      .then((doc) => router.navigate("/docs/" + doc.id))
+                      .catch((e: Error) => showToast(e.message));
+                  });
+                });
+              });
+            });
+          });
+        },
+      },
       { kind: "action", label: t("palette.goto_tasks"), sub: t("palette.tasks_sub"), action: () => router.navigate("/tasks") },
+      { kind: "action", label: t("palette.goto_search"), sub: t("palette.search_sub"), action: () => router.navigate("/search") },
       { kind: "action", label: t("palette.goto_graph"), sub: t("palette.graph_sub"), action: () => router.navigate("/graph") },
+      { kind: "action", label: t("palette.goto_settings"), sub: t("palette.settings_sub"), action: () => router.navigate("/settings") },
     ];
 
     for (const d of localDocs.value.filter((x) => x.workspaceId === activeWs.value)) {
