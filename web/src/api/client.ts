@@ -357,3 +357,34 @@ export const workspacesApi = {
     return res.json();
   },
 };
+
+// Comentarios por documento (filesystem .comments/).
+export interface Comment {
+  id: string;
+  author: string;
+  text: string;
+  created_at: string;
+}
+
+export const commentsApi = {
+  list: (docId: string) => api<{ comments: Comment[] }>(`/docs/${docId}/comments`),
+  add: (docId: string, text: string) =>
+    api<Comment>(`/docs/${docId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+};
+
+// Activity feed del workspace (change_log + comentarios).
+export interface ActivityEntry {
+  id: string;
+  entity: string;
+  op: string;
+  doc_title: string;
+  doc_path: string;
+  created_at: string;
+}
+
+export const activityApi = {
+  list: (wsId: string) => api<{ activity: ActivityEntry[] }>(`/workspaces/${wsId}/activity`),
+};

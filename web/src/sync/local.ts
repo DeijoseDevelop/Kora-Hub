@@ -35,6 +35,8 @@ export interface LocalTask {
   recur: string | null;     // *every: (§6.5)
   taskUid: string | null;   // ^id:
   blockedBy: string | null; // ^blocked-by:
+  depth: number;            // nivel de indentación (0 = raíz)
+  parentLine: number | null; // línea de la tarea padre
 }
 
 export interface LocalBacklink {
@@ -201,6 +203,8 @@ export async function reindexDoc(docId: string): Promise<number> {
       recur: t.recur,
       taskUid: t.taskUid,
       blockedBy: t.blockedBy,
+      depth: t.depth,
+      parentLine: t.parentLine,
     });
   }
   for (const link of extractBacklinks(doc.content)) {

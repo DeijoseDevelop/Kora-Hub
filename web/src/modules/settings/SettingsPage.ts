@@ -1,6 +1,6 @@
-import { ElurComponent, html, type ElurTemplate } from "@elurjs/core";
+import { ElurComponent, html, signal, type ElurTemplate } from "@elurjs/core";
 import { createQuery } from "@elurjs/query";
-import { authApi, clearToken, getToken, workspacesApi } from "../../api/client";
+import { activityApi, authApi, clearToken, getToken, workspacesApi, type ActivityEntry } from "../../api/client";
 import { pull } from "../../sync/client";
 import { showToast } from "../../ui/kit";
 import { MembersPanel } from "./MembersPanel";
@@ -35,9 +35,23 @@ function logout(): void {
 // crean antes del login y no se re-ejecutan solos — mismo patrón que
 // TasksPage/DocsPage).
 export class SettingsPage extends ElurComponent {
+  private activity = signal<ActivityEntry[] | null>(null);
+
   onMount(): void {
     ws.refetch();
     me.refetch();
+    this.loadActivity();
+  }
+
+  private async loadActivity(): Promise<void> {
+    const wsId = ws.data.value?.[0]?.id;
+    if (!wsId) return;
+    try {
+      const res = await activityApi.list(wsId);
+      this.activity.value = res.activity.slice(0, 30);
+    } catch {
+      this.activity.value = [];
+    }
   }
 
   render(): ElurTemplate {
@@ -107,6 +121,20 @@ export class SettingsPage extends ElurComponent {
         (ws.data.value ?? []).length === 0
           ? html`<p class="muted">${() => t("settings.loading_ws")}</p>`
           : ""}
+
+        <h3>${() => t("activity.title")}</h3>
+        <div class="ws-card" style="flex-direction:column;align-items:stretch">
+          ${() => (this.activity.value ?? []).length === 0
+          ? html`<p class="muted">${() => t("activity.empty")}</p>`
+          : html`<div class="activity-list">
+              ${(this.activity.value ?? []).map((a) => html`
+                <div class="activity-row">
+                  <span class=${"activity-op " + a.op}>${a.op === "upsert" ? t("activity.doc_updated") : a.op === "delete" ? t("activity.doc_deleted") : a.op === "create" ? t("activity.doc_created") : t("activity.comment")}</span>
+                  <span class="activity-doc">${a.doc_title || a.doc_path}</span>
+                  <span class="activity-date">${a.created_at.slice(0, 16).replace("T", " ")}</span>
+                </div>`)}
+            </div>`}
+        </div>
 
         <h3>${() => t("settings.new_ws")}</h3>
         <form class="settings-form" @submit=${(ev: Event) => {

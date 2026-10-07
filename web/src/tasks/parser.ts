@@ -29,6 +29,8 @@ export interface ParsedTask {
   recur: string | null;    // *every:<intervalo> (sección 6.5)
   taskUid: string | null;  // ^id: identidad estable opcional
   blockedBy: string | null; // ^blocked-by: referencia a otro ^id
+  depth: number;           // nivel de indentación (0 = raíz)
+  parentLine: number | null; // línea de la tarea padre (null = raíz)
 }
 
 // looksLikeTask reporta si un texto ya tiene forma de tarea embebida
@@ -39,12 +41,14 @@ export function looksLikeTask(text: string): boolean {
 
 export function parseLine(line: string): ParsedTask | null {
   const trimmed = line.replace(/[ \t]+$/, "");
-  // checkbox estricto: '- [ ]' requiere espacio tras ']'; [X] cuenta
-  // como hecha (estilo GitHub) y se acepta tabulador tras '-'.
-  const m = /^-[ \t]\[([ xX~])\][ \t]+(.+)$/.exec(trimmed);
+  // checkbox: '- [ ]' / '- [x]' / '- [~]' — soporta indentación para sub-tareas
+  const m = /^(\s*)-([ \t])\[([ xX~])\][ \t]+(.+)$/.exec(trimmed);
   if (!m) return null;
-  const state = m[1] === "X" ? "x" : m[1];
-  const rest = m[2];
+  const indent = m[1].replace(/\t/g, "  ");
+  const depth = Math.floor(indent.length / 2);
+  const rawState = m[3];
+  const state = rawState === "X" ? "x" : rawState;
+  const rest = m[4];
 
   const t: ParsedTask = {
     line: 0,
@@ -60,6 +64,8 @@ export function parseLine(line: string): ParsedTask | null {
     recur: null,
     taskUid: null,
     blockedBy: null,
+    depth,
+    parentLine: null,
   };
 
   const textParts: string[] = [];
@@ -93,12 +99,19 @@ export function parseLine(line: string): ParsedTask | null {
 export function parse(content: string): ParsedTask[] {
   const out: ParsedTask[] = [];
   const lines = content.split("\n");
+  // stack de tareas padre por nivel de indentación
+  const stack: ParsedTask[] = [];
   for (let i = 0; i < lines.length; i++) {
     const t = parseLine(lines[i]);
-    if (t) {
-      t.line = i + 1;
-      out.push(t);
+    if (!t) continue;
+    t.line = i + 1;
+    // resolver padre: la tarea en el stack con depth = t.depth - 1
+    while (stack.length > 0 && stack[stack.length - 1].depth >= t.depth) stack.pop();
+    if (t.depth > 0 && stack.length > 0) {
+      t.parentLine = stack[stack.length - 1].line;
     }
+    stack.push(t);
+    out.push(t);
   }
   return out;
 }

@@ -2606,3 +2606,214 @@ kbd {
   font-weight: 600;
   color: var(--accent-hover);
 }
+
+/* Sub-tareas anidadas en kanban */
+.task-card.has-subs {
+  gap: var(--s-2);
+}
+
+.sub-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--s-2) 0 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.sub-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: 3px;
+}
+
+.sub-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-soft);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+
+.sub-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--r-full);
+  transition: width var(--med) var(--ease);
+}
+
+.sub-count {
+  font-size: var(--t-caption);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sub-task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: var(--t-sm);
+  color: var(--text-dim);
+  cursor: grab;
+}
+
+.sub-task:hover {
+  color: var(--text);
+}
+
+.sub-task.done {
+  opacity: 0.55;
+}
+
+.sub-task.done .sub-task-text {
+  text-decoration: line-through;
+}
+
+.sub-task .mini-checkbox {
+  width: 13px;
+  height: 13px;
+  border-width: 1.5px;
+}
+
+.sub-task-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Comentarios */
+.comments-panel {
+  margin-top: var(--s-4);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  background: var(--bg-soft);
+  padding: var(--s-3) var(--s-4);
+}
+
+.comments-panel h4 {
+  margin: 0 0 var(--s-3);
+  font-size: var(--t-base);
+}
+
+.comment-row {
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.comment-row:last-of-type {
+  border-bottom: none;
+}
+
+.comment-author {
+  font-weight: 600;
+  font-size: var(--t-sm);
+  color: var(--text);
+}
+
+.comment-date {
+  font-size: var(--t-caption);
+  margin-left: var(--s-2);
+}
+
+.comment-text {
+  margin: 3px 0 0;
+  font-size: var(--t-sm);
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.comment-input-row {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.comment-input {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px var(--s-3);
+  font-size: var(--t-sm);
+  color: var(--text);
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+
+.comment-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.comment-count {
+  background: var(--bg-elevated);
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  font-size: var(--t-caption);
+  margin-left: 3px;
+}
+
+/* Activity feed */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--t-sm);
+  color: var(--text-dim);
+  transition: background var(--fast);
+}
+
+.activity-row:hover {
+  background: var(--bg-elevated);
+}
+
+.activity-op {
+  font-size: var(--t-caption);
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.activity-op.upsert {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.activity-op.delete {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.activity-op.create {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.activity-doc {
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-date {
+  color: var(--text-faint);
+  font-size: var(--t-caption);
+  white-space: nowrap;
+}

@@ -6,7 +6,7 @@ import { MarkdownEditor } from "./MarkdownEditor";
 import { parseLine } from "../../tasks/parser";
 import { escapeHtml, formatDate, isOverdue, showToast } from "../../ui/kit";
 import { sanitizeHTML } from "../../ui/sanitize";
-import { attachmentsApi, docsApi, sharesApi, type Backlink, type DocVersion, type ShareState } from "../../api/client";
+import { attachmentsApi, commentsApi, docsApi, sharesApi, type Backlink, type Comment, type DocVersion, type ShareState } from "../../api/client";
 import { activeWs } from "../../data/workspace";
 import { lineDiff } from "./diff";
 import { t } from "../../i18n";
@@ -24,6 +24,8 @@ export class DocEditorPage extends ElurComponent {
   private backlinks = signal<Backlink[] | null>(null);
   // undefined = panel cerrado; null-token = doc sin share activo.
   private share = signal<ShareState | undefined>(undefined);
+  private comments = signal<Comment[] | null>(null);
+  private commentText = "";
 
   onMount(): void {
     const id = router.params.value.id ?? "";
@@ -55,6 +57,7 @@ export class DocEditorPage extends ElurComponent {
           </div>
           <div class="doc-actions">
             <button class="btn ghost" id="toggle-versions" @click=${() => void this.toggleVersions()}>${() => t("editor.history")}</button>
+            <button class="btn ghost" id="toggle-comments" @click=${() => void this.toggleComments()}>${() => t("editor.comments")} <span class="comment-count">${() => this.comments.value?.length ?? 0}</span></button>
             <button class="btn ghost" id="toggle-share" @click=${() => void this.toggleShare()}>${() => t("editor.share")}</button>
             <button class="btn" @click=${() => this.save()}>${() => t("editor.save")}</button>
           </div>
@@ -101,6 +104,26 @@ export class DocEditorPage extends ElurComponent {
                   </div>`)}
           </div>
         ` : ""}
+        ${() => this.comments.value !== null ? html`
+          <div class="comments-panel">
+            <h4>${() => t("editor.comments")}</h4>
+            ${(this.comments.value ?? []).length === 0
+          ? html`<p class="muted">${() => t("editor.no_comments")}</p>`
+          : (this.comments.value ?? []).map((cm) => html`
+                  <div class="comment-row">
+                    <span class="comment-author">${cm.author}</span>
+                    <span class="comment-date faint">${cm.created_at.slice(0, 16).replace("T", " ")}</span>
+                    <p class="comment-text">${cm.text}</p>
+                  </div>`)}
+            <div class="comment-input-row">
+              <input id="comment-input" class="comment-input" placeholder=${() => t("editor.comment_ph")}
+                value=${() => this.commentText}
+                @input=${(ev: Event) => (this.commentText = (ev.target as HTMLInputElement).value)}
+                @keydown=${(ev: KeyboardEvent) => { if (ev.key === "Enter") void this.addComment(); }} />
+              <button class="btn sm" @click=${() => void this.addComment()}>${() => t("editor.comment_send")}</button>
+            </div>
+          </div>
+        ` : ""}
         ${() => this.backlinks.value !== null && this.backlinks.value!.length > 0 ? html`
           <div class="backlinks-panel">
             <h4>${() => t("editor.backlinks")}</h4>
@@ -129,6 +152,42 @@ export class DocEditorPage extends ElurComponent {
     } catch (e) {
       showToast((e as Error).message);
       return null;
+    }
+  }
+
+  private async toggleComments(): Promise<void> {
+    if (this.comments.value !== null) {
+      this.comments.value = null;
+      return;
+    }
+    const serverId = this.current?.serverId ?? this.current?.id;
+    if (!serverId || serverId.startsWith("local-")) {
+      showToast(t("editor.sync_first"));
+      return;
+    }
+    try {
+      const res = await commentsApi.list(serverId);
+      this.comments.value = res.comments;
+    } catch {
+      this.comments.value = [];
+    }
+  }
+
+  private async addComment(): Promise<void> {
+    const text = this.commentText.trim();
+    if (!text) return;
+    const serverId = this.current?.serverId ?? this.current?.id;
+    if (!serverId || serverId.startsWith("local-")) {
+      showToast(t("editor.sync_first"));
+      return;
+    }
+    try {
+      await commentsApi.add(serverId, text);
+      this.commentText = "";
+      const res = await commentsApi.list(serverId);
+      this.comments.value = res.comments;
+    } catch (e) {
+      showToast((e as Error).message);
     }
   }
 

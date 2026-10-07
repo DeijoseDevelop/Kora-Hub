@@ -135,5 +135,7 @@ export async function quickAddLocal(text: string): Promise<LocalTask | null> {
     recur: created.recur,
     taskUid: created.taskUid,
     blockedBy: created.blockedBy,
+    depth: created.depth,
+    parentLine: created.parentLine,
   };
 }

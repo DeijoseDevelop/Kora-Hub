@@ -100,6 +100,7 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 			authed.DELETE("/workspaces/:id/members/:uid", s.handleRemoveMember)
 			authed.GET("/workspaces/:id/export", s.handleExportWorkspace)
 			authed.POST("/workspaces/:id/import", s.handleImportWorkspace)
+			authed.GET("/workspaces/:id/activity", s.handleWorkspaceActivity)
 
 			authed.GET("/views", s.handleListViews)
 			authed.POST("/views", s.handleCreateView)
@@ -113,6 +114,8 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 			authed.GET("/docs/:id/versions", s.handleListDocVersions)
 			authed.GET("/docs/:id/versions/:vid", s.handleGetDocVersion)
 			authed.GET("/docs/:id/backlinks", s.handleListDocBacklinks)
+			authed.GET("/docs/:id/comments", s.handleListDocComments)
+			authed.POST("/docs/:id/comments", s.handleAddDocComment)
 			authed.GET("/docs/:id/share", s.handleGetShare)
 			authed.POST("/docs/:id/share", s.handleCreateShare)
 			authed.DELETE("/docs/:id/share", s.handleDeleteShare)

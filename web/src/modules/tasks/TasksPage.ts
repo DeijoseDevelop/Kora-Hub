@@ -218,8 +218,15 @@ function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter
       if (items.length === 0) {
         return html`<div class="kanban-empty">${() => tr("tasks.col_empty")}</div>`;
       }
-      return items.map((t) => html`
-            <div class=${"task-card" + (t.done ? " done" : "")} draggable="true"
+      // agrupar: sub-tareas (depth>0) se muestran dentro de su padre
+      const top = items.filter((t) => !t.depth);
+      const childrenOf = (parentLine: number) =>
+        items.filter((t) => t.depth > 0 && t.parentLine === parentLine);
+      return top.map((t) => {
+        const subs = childrenOf(t.lineNo);
+        const subDone = subs.filter((s) => s.done).length;
+        return html`
+            <div class=${"task-card" + (t.done ? " done" : "") + (subs.length ? " has-subs" : "")} draggable="true"
               @dragstart=${(ev: DragEvent) => {
           (ev.currentTarget as HTMLElement).classList.add("dragging");
           ev.dataTransfer?.setData("text/plain", t.id);
@@ -227,6 +234,25 @@ function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter
         }}
               @dragend=${(ev: DragEvent) => (ev.currentTarget as HTMLElement).classList.remove("dragging")}>
               <div class="task-text">${t.title}</div>
+              ${subs.length > 0 ? html`
+                <div class="sub-tasks">
+                  <div class="sub-progress">
+                    <div class="sub-progress-bar"><div class="sub-progress-fill" style=${"width:" + Math.round((subDone / Math.max(1, subs.length)) * 100) + "%"}></div></div>
+                    <span class="sub-count">${subDone}/${subs.length}</span>
+                  </div>
+                  ${subs.map((s) => html`
+                    <div class=${"sub-task" + (s.done ? " done" : "")} draggable="true"
+                      @dragstart=${(ev: DragEvent) => {
+                  ev.stopPropagation();
+                  (ev.currentTarget as HTMLElement).classList.add("dragging");
+                  ev.dataTransfer?.setData("text/plain", s.id);
+                  ev.dataTransfer!.effectAllowed = "move";
+                }}
+                      @dragend=${(ev: DragEvent) => (ev.currentTarget as HTMLElement).classList.remove("dragging")}>
+                      <span class=${"mini-checkbox" + (s.done ? " checked" : "")} @click=${() => void toggle(s)}></span>
+                      <span class="sub-task-text">${s.title}</span>
+                    </div>`)}
+                </div>` : ""}
               <div class="task-meta">
                 <div class="task-badges">${taskBadges(t)}</div>
                 <span class="source-doc" title=${() => tr("tasks.open_doc")}
@@ -238,7 +264,8 @@ function kanbanColumn(label: string, dot: string, state: " " | "x" | "~", getter
                   ${() => tr("tasks.open_doc")}
                 </span>
               </div>
-            </div>`);
+            </div>`;
+      });
     }}
       </div>
     </div>
