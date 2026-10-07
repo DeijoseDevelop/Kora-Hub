@@ -181,3 +181,48 @@ func (s *Server) handleWorkspaceActivity(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"activity": entries})
 }
+
+// handleWorkspaceCalendar genera un feed ICS con las tareas fechadas
+// del workspace — suscribible desde Google/Apple Calendar.
+func (s *Server) handleWorkspaceCalendar(c *gin.Context) {
+	userID := c.GetString("user_id")
+	r, ok := s.workspaceFromPath(c, userID)
+	if !ok {
+		return
+	}
+	tasks, err := s.queries.ListTasksByWorkspace(c, db.ListTasksByWorkspaceParams{
+		WorkspaceID: r.workspace.ID, Done: 0,
+	})
+	if err != nil {
+		s.fail(c, http.StatusInternalServerError, "internal", "error de base de datos")
+		return
+	}
+
+	now := time.Now().UTC().Format("20060102T150405Z")
+	var b strings.Builder
+	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kora Hub//ES\r\n")
+	b.WriteString("X-WR-CALNAME:" + r.workspace.Name + "\r\n")
+	for _, t := range tasks {
+		if !t.DueDate.Valid || t.DueDate.String == "" {
+			continue
+		}
+		d := strings.ReplaceAll(t.DueDate.String, "-", "")
+		b.WriteString("BEGIN:VEVENT\r\n")
+		b.WriteString("UID:" + t.ID + "@kora-hub\r\n")
+		b.WriteString("DTSTAMP:" + now + "\r\n")
+		b.WriteString("DTSTART;VALUE=DATE:" + d + "\r\n")
+		b.WriteString("SUMMARY:" + strings.ReplaceAll(t.Title, "\n", " ") + "\r\n")
+		if t.Project.Valid {
+			b.WriteString("CATEGORIES:" + t.Project.String + "\r\n")
+		}
+		if t.Assignee.Valid {
+			b.WriteString("ATTENDEE:" + t.Assignee.String + "\r\n")
+		}
+		b.WriteString("END:VEVENT\r\n")
+	}
+	b.WriteString("END:VCALENDAR\r\n")
+
+	c.Header("Content-Type", "text/calendar; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="`+r.workspace.Slug+`.ics"`)
+	c.String(http.StatusOK, b.String())
+}

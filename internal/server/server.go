@@ -101,6 +101,7 @@ func (s *Server) Router(webFS fs.FS) *gin.Engine {
 			authed.GET("/workspaces/:id/export", s.handleExportWorkspace)
 			authed.POST("/workspaces/:id/import", s.handleImportWorkspace)
 			authed.GET("/workspaces/:id/activity", s.handleWorkspaceActivity)
+			authed.GET("/workspaces/:id/calendar.ics", s.handleWorkspaceCalendar)
 
 			authed.GET("/views", s.handleListViews)
 			authed.POST("/views", s.handleCreateView)

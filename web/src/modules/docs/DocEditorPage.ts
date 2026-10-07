@@ -434,6 +434,97 @@ ${preview.innerHTML}
     preview.innerHTML = html;
     this.enhanceTaskLines(preview);
     this.enhanceCallouts(preview);
+    this.enhanceMath(preview);
+    this.enhanceFootnotes(preview);
+  }
+
+  // enhanceMath renderiza $...$ (inline) y $$...$$ (block) como spans
+  // estilizados de LaTeX — sin dependencias externas (font monospace +
+  // estilo visual). KaTeX completo queda para v2.
+  private enhanceMath(preview: HTMLElement): void {
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent ?? "";
+        if (!text.includes("$")) return;
+        const frag = document.createDocumentFragment();
+        // $$block$$ primero, luego $inline$
+        const re = /(\$\$[\s\S]+?\$\$)|(\$[^$\n]+?\$)/g;
+        let last = 0;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(text)) !== null) {
+          if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+          const isBlock = !!m[1];
+          const code = (m[1] ?? m[2]).replace(/^\$+|\$+$/g, "");
+          const span = document.createElement(isBlock ? "div" : "span");
+          span.className = isBlock ? "math-block" : "math-inline";
+          span.textContent = code;
+          frag.appendChild(span);
+          last = m.index + m[0].length;
+        }
+        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+        node.parentNode?.replaceChild(frag, node);
+        return;
+      }
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        // no entrar en code/pre
+        const tag = (node as Element).tagName;
+        if (tag === "CODE" || tag === "PRE" || tag === "SCRIPT" || tag === "STYLE") return;
+        for (const child of Array.from(node.childNodes)) walk(child);
+      }
+    };
+    walk(preview);
+  }
+
+  // enhanceFootnotes renderiza [^1] como superscript y colecta las
+  // definiciones al final del documento.
+  private enhanceFootnotes(preview: HTMLElement): void {
+    const defs = new Map<string, string>();
+    // recolectar definiciones: líneas que empiezan por [^id]:
+    const allText = preview.textContent ?? "";
+    const defRe = /^\[\^(\w+)\]:\s*(.+)$/gm;
+    let d: RegExpExecArray | null;
+    while ((d = defRe.exec(allText)) !== null) {
+      defs.set(d[1], d[2].trim());
+    }
+    // reemplazar referencias [^id] por superscript
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent ?? "";
+        if (!text.includes("[^")) return;
+        const frag = document.createDocumentFragment();
+        const re = /\[\^(\w+)\]/g;
+        let last = 0;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(text)) !== null) {
+          if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+          const id = m[1];
+          const sup = document.createElement("sup");
+          sup.className = "fn-ref";
+          sup.textContent = id;
+          sup.title = defs.get(id) ?? "";
+          frag.appendChild(sup);
+          last = m.index + m[0].length;
+        }
+        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+        node.parentNode?.replaceChild(frag, node);
+        return;
+      }
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = (node as Element).tagName;
+        if (tag === "CODE" || tag === "PRE") return;
+        for (const child of Array.from(node.childNodes)) walk(child);
+      }
+    };
+    walk(preview);
+    // sección de notas al final
+    if (defs.size > 0) {
+      const section = document.createElement("div");
+      section.className = "fn-section";
+      section.innerHTML = `<hr><h4>Notas</h4>` + [...defs.entries()]
+        .map(([id, text]) => `<p class="fn-note"><sup>${id}</sup> ${text}</p>`)
+        .join("");
+      preview.appendChild(section);
+    }
   }
 
   // enhanceCallouts convierte blockquotes '> [!type] Título' en callouts
