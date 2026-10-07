@@ -96,8 +96,9 @@ export async function setTaskStateLocal(task: LocalTask, state: " " | "x" | "~")
 // quickAddLocal: anexa la tarea a Inbox.md local (round-trip del texto
 // natural) y sincroniza el doc. Devuelve la tarea creada.
 export async function quickAddLocal(text: string): Promise<LocalTask | null> {
-  const { parseLine, roundTrip } = await import("../tasks/parser");
-  const line = "- [ ] " + text.trim();
+  const { parseLine, roundTrip, looksLikeTask } = await import("../tasks/parser");
+  const trimmed = text.trim();
+  const line = looksLikeTask(trimmed) ? trimmed : "- [ ] " + trimmed;
   const parsed = parseLine(line);
   if (!parsed) return null;
   const canonical = roundTrip(parsed, " ", parsed.dueDate, parsed.project, parsed.priority, parsed.assignee);

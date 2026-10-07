@@ -362,3 +362,23 @@ func TestParseLineHashtagInTitle(t *testing.T) {
 func contains(s, sub string) bool {
 	return strings.Contains(s, sub)
 }
+
+// TestLooksLikeTask: no se debe duplicar el checkbox si el texto ya lo
+// trae (regresión: el quick-add generaba "- [ ] - [x] ...").
+func TestLooksLikeTask(t *testing.T) {
+	for text, want := range map[string]bool{
+		"- [ ] tarea":          true,
+		"- [x] tarea hecha":    true,
+		"- [~] en progreso":    true,
+		"- [X] mayuscula":      true,
+		"tarea sin checkbox":   false,
+		"- tarea normal":       false,
+		"- [ ]":                false, // sin texto
+		"":                     false,
+		"  - [ ] con espacios": true,
+	} {
+		if got := LooksLikeTask(text); got != want {
+			t.Errorf("LooksLikeTask(%q) = %v, want %v", text, got, want)
+		}
+	}
+}

@@ -31,6 +31,12 @@ export interface ParsedTask {
   blockedBy: string | null; // ^blocked-by: referencia a otro ^id
 }
 
+// looksLikeTask reporta si un texto ya tiene forma de tarea embebida
+// (checkbox Markdown) — evita duplicar el prefijo al construir la línea.
+export function looksLikeTask(text: string): boolean {
+  return /^-[ \t]\[[ xX~]\][ \t]+\S/.test(text.trim());
+}
+
 export function parseLine(line: string): ParsedTask | null {
   const trimmed = line.replace(/[ \t]+$/, "");
   // checkbox estricto: '- [ ]' requiere espacio tras ']'; [X] cuenta

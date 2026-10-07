@@ -286,7 +286,13 @@ func (h *Handler) toolQuickAddTask(ctx context.Context, ws Workspace, args map[s
 	if strings.TrimSpace(text) == "" {
 		return errResult("text es obligatorio")
 	}
-	line := "- [ ] " + strings.TrimSpace(text)
+	trimmed := strings.TrimSpace(text)
+	var line string
+	if tasks.LooksLikeTask(trimmed) {
+		line = trimmed
+	} else {
+		line = "- [ ] " + trimmed
+	}
 	parsed, ok := tasks.ParseLine(line)
 	if !ok {
 		return errResult("no se pudo interpretar la tarea")

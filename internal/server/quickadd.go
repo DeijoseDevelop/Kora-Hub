@@ -44,8 +44,15 @@ func (s *Server) handleQuickAdd(c *gin.Context) {
 		return
 	}
 
-	// el texto se parsea idéntico a una línea de documento
-	line := "- [ ] " + strings.TrimSpace(req.Text)
+	// el texto se parsea idéntico a una línea de documento; si ya trae
+	// checkbox se usa tal cual (si no, se duplicaría el prefijo)
+	text := strings.TrimSpace(req.Text)
+	var line string
+	if tasks.LooksLikeTask(text) {
+		line = text
+	} else {
+		line = "- [ ] " + text
+	}
 	parsed, ok := tasks.ParseLine(line)
 	if !ok {
 		s.fail(c, http.StatusBadRequest, "unparseable", "no se pudo interpretar la tarea")

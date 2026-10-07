@@ -53,6 +53,17 @@ type Task struct {
 	BlockedBy  string   `json:"blocked_by"` // ^blocked-by: referencia a otro ^id
 }
 
+// LooksLikeTask reporta si un texto ya tiene forma de tarea embebida
+// (checkbox Markdown) — evita duplicar el prefijo al construir la línea.
+func LooksLikeTask(text string) bool {
+	t := strings.TrimSpace(text)
+	if len(t) < 6 || t[0] != '-' {
+		return false
+	}
+	_, _, ok := parseCheckbox(t)
+	return ok
+}
+
 // ParseLine intenta parsear una línea de documento como tarea embebida.
 // Devuelve ok=false si la línea no es un checkbox Markdown.
 func ParseLine(line string) (Task, bool) {

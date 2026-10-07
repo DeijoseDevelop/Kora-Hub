@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { applyTaskState, nextOccurrence, parse, parseLine, roundTrip, spawnRecurring } from "./parser";
+import { applyTaskState, looksLikeTask, nextOccurrence, parse, parseLine, roundTrip, spawnRecurring } from "./parser";
 
 describe("parseLine", () => {
   test("estados básicos", () => {
@@ -136,5 +136,17 @@ describe("roundTrip", () => {
     expect(out).toContain("- [x] Primera");
     const out2 = applyTaskState(content, parse(content)[1], " ");
     expect(out2).toContain("- [ ] Segunda");
+  });
+});
+
+describe("looksLikeTask", () => {
+  test("detecta checkbox y evita duplicar prefijo", () => {
+    expect(looksLikeTask("- [ ] tarea")).toBe(true);
+    expect(looksLikeTask("- [x] hecha")).toBe(true);
+    expect(looksLikeTask("- [~] progreso")).toBe(true);
+    expect(looksLikeTask("tarea sin checkbox")).toBe(false);
+    expect(looksLikeTask("- tarea normal")).toBe(false);
+    expect(looksLikeTask("- [ ]")).toBe(false);
+    expect(looksLikeTask("  - [ ] con espacios")).toBe(true);
   });
 });
