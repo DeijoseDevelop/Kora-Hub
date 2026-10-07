@@ -2435,3 +2435,174 @@ kbd {
   margin: var(--s-2);
   opacity: 0.6;
 }
+
+/* ==========================================================================
+   Dark mode — override de tokens semánticos (DS v3)
+   Linear-style: superficies cálidas oscuras, un acento, flat depth.
+   Activado por [data-theme="dark"] o prefers-color-scheme.
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--n-950);
+    --bg-soft: var(--n-900);
+    --bg-elevated: var(--n-800);
+    --bg-hover: var(--n-700);
+    --bg-active: var(--n-600);
+    --bg-inset: var(--n-900);
+
+    --border: var(--n-700);
+    --border-soft: var(--n-800);
+    --border-strong: var(--n-600);
+
+    --text: var(--n-50);
+    --text-dim: var(--n-300);
+    --text-faint: var(--n-400);
+    --text-inverse: var(--n-900);
+
+    --accent: var(--a-400);
+    --accent-hover: var(--a-300);
+    --accent-active: var(--a-200);
+    --accent-soft: oklch(30% 0.08 220);
+    --accent-glow: oklch(68% 0.15 220 / 0.2);
+    --accent-fg: var(--n-950);
+
+    --red: oklch(65% 0.2 25);
+    --red-soft: oklch(30% 0.08 25);
+    --amber: oklch(75% 0.15 65);
+    --amber-soft: oklch(30% 0.06 65);
+    --green: oklch(65% 0.15 150);
+    --green-soft: oklch(30% 0.06 150);
+    --blue: oklch(68% 0.15 250);
+    --blue-soft: oklch(30% 0.06 250);
+
+    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.3);
+    --shadow-md: 0 4px 12px oklch(0% 0 0 / 0.35);
+    --shadow-lg: 0 12px 32px oklch(0% 0 0 / 0.4);
+    --shadow-xl: 0 20px 60px oklch(0% 0 0 / 0.5);
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: var(--n-950);
+  --bg-soft: var(--n-900);
+  --bg-elevated: var(--n-800);
+  --bg-hover: var(--n-700);
+  --bg-active: var(--n-600);
+  --bg-inset: var(--n-900);
+
+  --border: var(--n-700);
+  --border-soft: var(--n-800);
+  --border-strong: var(--n-600);
+
+  --text: var(--n-50);
+  --text-dim: var(--n-300);
+  --text-faint: var(--n-400);
+  --text-inverse: var(--n-900);
+
+  --accent: var(--a-400);
+  --accent-hover: var(--a-300);
+  --accent-active: var(--a-200);
+  --accent-soft: oklch(30% 0.08 220);
+  --accent-glow: oklch(68% 0.15 220 / 0.2);
+  --accent-fg: var(--n-950);
+
+  --red: oklch(65% 0.2 25);
+  --red-soft: oklch(30% 0.08 25);
+  --amber: oklch(75% 0.15 65);
+  --amber-soft: oklch(30% 0.06 65);
+  --green: oklch(65% 0.15 150);
+  --green-soft: oklch(30% 0.06 150);
+  --blue: oklch(68% 0.15 250);
+  --blue-soft: oklch(30% 0.06 250);
+
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-md: 0 4px 12px oklch(0% 0 0 / 0.35);
+  --shadow-lg: 0 12px 32px oklch(0% 0 0 / 0.4);
+  --shadow-xl: 0 20px 60px oklch(0% 0 0 / 0.5);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* Ajustes que dependen del tema */
+:root[data-theme="dark"] .logo-mark {
+  background: linear-gradient(135deg, var(--n-700), var(--accent));
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo-mark {
+    background: linear-gradient(135deg, var(--n-700), var(--accent));
+    box-shadow: none;
+  }
+}
+
+:root[data-theme="dark"] .login-view {
+  background-image: radial-gradient(1200px 600px at 50% -10%, oklch(30% 0.08 220 / 0.4), transparent 60%);
+}
+
+:root[data-theme="dark"] .task-checkbox.checked::after,
+:root[data-theme="dark"] .mini-checkbox.checked::after {
+  border-color: var(--n-950);
+}
+
+:root[data-theme="dark"] .toast::before {
+  background: var(--green);
+}
+
+/* Toggle de tema */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 6px var(--s-3);
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: all var(--fast);
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.theme-toggle .icon {
+  font-size: 14px;
+}
+
+/* Bulk actions + sort en tabla */
+.list-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.list-table th.sortable:hover {
+  color: var(--text);
+}
+
+.list-table tr.selected-row td {
+  background: var(--accent-soft);
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  font-size: var(--t-sm);
+  animation: palette-in var(--fast) var(--ease);
+}
+
+.bulk-count {
+  font-weight: 600;
+  color: var(--accent-hover);
+}

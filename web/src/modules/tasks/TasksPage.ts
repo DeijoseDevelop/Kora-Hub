@@ -269,14 +269,61 @@ function kanbanView(): ElurTemplate {
 
 // ---------------------------- Tabla ----------------------------
 
+const tableSort = signal<{ col: string; dir: 1 | -1 }>({ col: "dueDate", dir: 1 });
+const selectedIds = signal<Set<string>>(new Set());
+
 function tablaView(): ElurTemplate {
-  const rows = localTasks.value.filter((t) => {
+  const filtered = () => {
     const [proyecto, done] = tableParams.value;
-    if (t.workspaceId !== activeWs.value) return false;
-    if (proyecto && t.project !== proyecto) return false;
-    if (done === "1" ? !t.done : t.done) return false;
-    return true;
-  });
+    return localTasks.value.filter((t) => {
+      if (t.workspaceId !== activeWs.value) return false;
+      if (proyecto && t.project !== proyecto) return false;
+      if (done === "1" ? !t.done : t.done) return false;
+      return true;
+    });
+  };
+  const sorted = () => {
+    const s = tableSort.value;
+    const rows = [...filtered()];
+    rows.sort((a, b) => {
+      let va: string | number = "", vb: string | number = "";
+      switch (s.col) {
+        case "title": va = a.title.toLowerCase(); vb = b.title.toLowerCase(); break;
+        case "dueDate": va = a.dueDate ?? "zzz"; vb = b.dueDate ?? "zzz"; break;
+        case "project": va = a.project ?? ""; vb = b.project ?? ""; break;
+        case "priority": va = a.priority ?? ""; vb = b.priority ?? ""; break;
+        default: va = a.title; vb = b.title;
+      }
+      return (va < vb ? -1 : va > vb ? 1 : 0) * s.dir;
+    });
+    return rows;
+  };
+  const sortBy = (col: string) => {
+    tableSort.value = {
+      col,
+      dir: tableSort.value.col === col ? ((tableSort.value.dir === 1 ? -1 : 1) as 1 | -1) : 1,
+    };
+  };
+  const toggleSelect = (id: string) => {
+    const s = new Set(selectedIds.value);
+    s.has(id) ? s.delete(id) : s.add(id);
+    selectedIds.value = s;
+  };
+  const selectAll = () => {
+    const rows = sorted();
+    const s = selectedIds.value;
+    selectedIds.value = s.size === rows.length ? new Set() : new Set(rows.map((t) => t.id));
+  };
+  const bulkDone = (done: boolean) => {
+    const s = selectedIds.value;
+    for (const t of sorted()) {
+      if (s.has(t.id) && t.done !== done) void toggle(t);
+    }
+    selectedIds.value = new Set();
+  };
+  const sortIcon = (col: string) =>
+    tableSort.value.col === col ? (tableSort.value.dir === 1 ? "↑" : "↓") : "";
+
   return html`
     <div class="list-toolbar">
       <select value=${() => tableParams.value[0]}
@@ -294,35 +341,44 @@ function tablaView(): ElurTemplate {
         <option value="0">${() => tr("tasks.pending")}</option>
         <option value="1">${() => tr("tasks.completed")}</option>
       </select>
+      ${() => selectedIds.value.size > 0 ? html`
+        <div class="bulk-bar">
+          <span class="bulk-count">${selectedIds.value.size} ${() => tr("tasks.selected")}</span>
+          <button class="btn sm ghost" @click=${() => bulkDone(true)}>${() => tr("tasks.bulk_done")}</button>
+          <button class="btn sm ghost" @click=${() => bulkDone(false)}>${() => tr("tasks.bulk_undone")}</button>
+          <button class="btn sm link" @click=${() => (selectedIds.value = new Set())}>${() => tr("tasks.bulk_clear")}</button>
+        </div>` : ""}
     </div>
     <div class="list-table-wrap">
       <table class="list-table">
         <thead>
-          <tr><th style="width: 30px"></th><th>${() => tr("tasks.col_task")}</th><th>${() => tr("tasks.col_date")}</th><th>${() => tr("tasks.col_project")}</th><th>${() => tr("tasks.col_priority")}</th></tr>
+          <tr>
+            <th style="width: 30px"><button class="mini-checkbox ${() => selectedIds.value.size === sorted().length && sorted().length > 0 ? "checked" : ""}" @click=${selectAll}></button></th>
+            <th class="sortable" @click=${() => sortBy("title")}>${() => tr("tasks.col_task")} ${sortIcon("title")}</th>
+            <th class="sortable" @click=${() => sortBy("dueDate")}>${() => tr("tasks.col_date")} ${sortIcon("dueDate")}</th>
+            <th class="sortable" @click=${() => sortBy("project")}>${() => tr("tasks.col_project")} ${sortIcon("project")}</th>
+            <th class="sortable" @click=${() => sortBy("priority")}>${() => tr("tasks.col_priority")} ${sortIcon("priority")}</th>
+          </tr>
         </thead>
         <tbody>
           ${() =>
-      localTasks.value
-        .filter((t) => {
-          const [proyecto, done] = tableParams.value;
-          if (t.workspaceId !== activeWs.value) return false;
-          if (proyecto && t.project !== proyecto) return false;
-          if (done === "1" ? !t.done : t.done) return false;
-          return true;
-        })
-        .map((t) => html`
-                <tr>
+      sorted().map((t) => html`
+                <tr class=${selectedIds.value.has(t.id) ? "selected-row" : ""}>
+                  <td>
+                    <button class=${"mini-checkbox" + (selectedIds.value.has(t.id) ? " checked" : "")} aria-label="select"
+                      @click=${() => toggleSelect(t.id)}></button>
+                  </td>
                   <td>
                     <button class=${"mini-checkbox" + (t.done ? " checked" : "")} aria-label="completar"
                       @click=${() => void toggle(t)}></button>
+                    <span class=${t.done ? "task-text-done" : ""}>${t.title}</span>
                   </td>
-                  <td><span class=${t.done ? "task-text-done" : ""}>${t.title}</span></td>
                   <td>${t.dueDate ? html`<span class=${"badge" + " date" + (isOverdue(t.dueDate) ? " overdue" : "")}>${formatDate(t.dueDate)}</span>` : html`<span class="faint">—</span>`}</td>
                   <td>${t.project ? html`<span class="badge project">${"@" + t.project}</span>` : html`<span class="faint">—</span>`}</td>
                   <td>${t.priority ? html`<span class=${"badge priority-" + t.priority}>${t.priority}</span>` : ""}</td>
                 </tr>`)}
           ${() =>
-      rows.length === 0
+      sorted().length === 0
         ? html`<tr><td colspan="5" class="empty-state">${() => tr("tasks.empty_filter")}</td></tr>`
         : ""}
         </tbody>

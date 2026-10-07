@@ -23,24 +23,64 @@ export class App extends ElurComponent {
   private workspaces = signal<Array<{ id: string; slug: string; name: string; role: string }>>([]);
   private searchQ = signal("");
   private sidebarOpen = signal(false);
+  private theme = signal<"light" | "dark" | "system">(
+    (localStorage.getItem("hub:theme") as "light" | "dark" | "system") ?? "system",
+  );
 
   onMount(): (() => void) | void {
+    this.applyTheme();
     const refresh = () => {
       this.online.value = navigator.onLine;
       queueLength().then((n) => (this.pending.value = n));
     };
     window.addEventListener("online", refresh);
     window.addEventListener("offline", refresh);
+    let gPressed = false;
+    let gTimer: ReturnType<typeof setTimeout> | null = null;
     const onKey = (ev: KeyboardEvent) => {
+      // no interceptar cuando se escribe en un input/textarea
+      const tag = (ev.target as HTMLElement)?.tagName;
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || (ev.target as HTMLElement)?.isContentEditable;
+
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
         ev.preventDefault();
         this.palette.toggle();
-      } else if (ev.key === "Escape") {
+        return;
+      }
+      if (ev.key === "Escape") {
         this.palette.close();
-      } else if (this.palette.isOpen() && (ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "Enter")) {
-        // las flechas/Enter se manejan aquí: el foco puede no estar en el
-        // input del palette y el keydown del input nunca llegaría
+        gPressed = false;
+        return;
+      }
+      if (this.palette.isOpen() && (ev.key === "ArrowDown" || ev.key === "ArrowUp" || ev.key === "Enter")) {
         this.palette.keydown(ev);
+        return;
+      }
+      if (typing) return;
+
+      // atajos g + <tecla> (Linear-style)
+      if (gPressed) {
+        gPressed = false;
+        if (gTimer) clearTimeout(gTimer);
+        const routes: Record<string, string> = {
+          d: "/docs", t: "/tasks", s: "/search", g: "/graph", k: "/settings",
+        };
+        const target = routes[ev.key.toLowerCase()];
+        if (target) {
+          ev.preventDefault();
+          router.navigate(target);
+        }
+        return;
+      }
+      if (ev.key === "g") {
+        gPressed = true;
+        gTimer = setTimeout(() => (gPressed = false), 1500);
+        return;
+      }
+      if (ev.key === "?") {
+        ev.preventDefault();
+        this.palette.toggle();
+        return;
       }
     };
     const onOpenDoc = (ev: Event) => {
@@ -70,6 +110,23 @@ export class App extends ElurComponent {
       window.removeEventListener("online", refresh);
       window.removeEventListener("offline", refresh);
     };
+  }
+
+  private applyTheme(): void {
+    const t = this.theme.value;
+    if (t === "system") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", t);
+    }
+    localStorage.setItem("hub:theme", t);
+  }
+
+  private cycleTheme(): void {
+    const order: Array<"light" | "dark" | "system"> = ["light", "dark", "system"];
+    const idx = order.indexOf(this.theme.value);
+    this.theme.value = order[(idx + 1) % order.length];
+    this.applyTheme();
   }
 
   private async bootstrap(): Promise<void> {
@@ -204,6 +261,9 @@ export class App extends ElurComponent {
             <button class="cmd-btn" @click=${() => this.palette.toggle()}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               ${() => t("app.search")} <kbd>⌘K</kbd>
+            </button>
+            <button class="theme-toggle" @click=${() => this.cycleTheme()} title=${() => t("app.theme")}>
+              <span class="icon">${() => this.theme.value === "dark" ? "🌙" : this.theme.value === "light" ? "☀️" : "🖥️"}</span>
             </button>
           </header>
           <main class="content">${new RouterView()}</main>

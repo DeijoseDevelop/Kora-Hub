@@ -18,6 +18,7 @@ export const en: Record<string, string> = {
   "app.offline": "offline",
   "app.pending": "pending",
   "app.search": "Search",
+  "app.theme": "Toggle theme",
 
   "auth.tagline": "The workspace where documentation and execution are the same thing.",
   "auth.login": "Sign in",
@@ -70,6 +71,10 @@ export const en: Record<string, string> = {
   "tasks.col_date": "Date",
   "tasks.col_project": "Project",
   "tasks.col_priority": "Priority",
+  "tasks.selected": "selected",
+  "tasks.bulk_done": "Complete",
+  "tasks.bulk_undone": "Reopen",
+  "tasks.bulk_clear": "Clear",
   "tasks.empty_filter": "No tasks match the filters",
   "tasks.today": "Today",
   "tasks.recurring": "Recurring",

@@ -19,6 +19,7 @@ export const es: Record<string, string> = {
   "app.offline": "sin conexión",
   "app.pending": "pendientes",
   "app.search": "Buscar",
+  "app.theme": "Cambiar tema",
 
   // Auth
   "auth.tagline": "El workspace donde la documentación y la ejecución son la misma cosa.",
@@ -74,6 +75,10 @@ export const es: Record<string, string> = {
   "tasks.col_date": "Fecha",
   "tasks.col_project": "Proyecto",
   "tasks.col_priority": "Prioridad",
+  "tasks.selected": "seleccionadas",
+  "tasks.bulk_done": "Completar",
+  "tasks.bulk_undone": "Reabrir",
+  "tasks.bulk_clear": "Limpiar",
   "tasks.empty_filter": "No hay tareas que coincidan con los filtros",
   "tasks.today": "Hoy",
   "tasks.recurring": "Recurrente",
