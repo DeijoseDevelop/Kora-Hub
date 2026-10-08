@@ -31,7 +31,9 @@ const final = join(binDir, `kora-hub-${triple}${ext}`);
 console.log(`[sidecar] go build (${triple}) v${version}`);
 // Las rutas van comilladas: el repo puede vivir en una carpeta con
 // espacios (p.ej. "Open Source") y execSync corta el comando por ' '.
-execSync(`go build -ldflags "-s -w -X github.com/DeijoseDevelop/Kora-Hub/internal/server.Version=${version}" -o "${tmp}" ./cmd/hub`, {
+// En Windows: -H windowsgui elimina la ventana de consola del sidecar.
+const winGui = process.platform === "win32" ? "-H windowsgui " : "";
+execSync(`go build -ldflags "-s -w ${winGui}-X github.com/DeijoseDevelop/Kora-Hub/internal/server.Version=${version}" -o "${tmp}" ./cmd/hub`, {
   cwd: root,
   stdio: "inherit",
 });

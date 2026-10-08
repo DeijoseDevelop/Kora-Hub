@@ -81,6 +81,12 @@ fn main() {
                     }
                     thread::sleep(Duration::from_millis(150));
                 }
+                // si el sidecar no arrancó, mostrar error en la ventana
+                let _ = window.navigate(Url::parse("about:blank").unwrap());
+                let _ = window.eval(&format!(
+                    "document.body.innerHTML='<div style=\"display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#e5484d;text-align:center;padding:2rem\"><div><h2>No se pudo iniciar el servidor local</h2><p>Revisa que el binario <code>kora-hub</code> esté junto a la app.</p><p style=\"color:#888;font-size:13px\">Puerto: {}</p></div></div>'",
+                    port
+                ));
             });
 
             Ok(())
