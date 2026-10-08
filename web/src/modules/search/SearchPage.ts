@@ -90,22 +90,25 @@ export class SearchPage extends ElurComponent {
             snippet: "",
           }),
         );
-        const norm = (s: string) => s.trim().toLowerCase();
-        const seen = new Set(hits.map((h) => h.kind + ":" + norm(h.title)));
-        for (const h of remote) {
-          const key = h.kind + ":" + norm(h.title);
-          if (!seen.has(key)) {
-            seen.add(key);
-            hits.push(h);
-          }
-        }
+        hits.push(...remote);
       } catch {
         /* sin red o FTS roto: los locales bastan */
       } finally {
         this.searching.value = false;
       }
     }
-    this.hits.value = hits;
+    // dedup global: local + servidor, por kind + título normalizado
+    const norm = (s: string) => s.trim().toLowerCase();
+    const seen = new Set<string>();
+    const deduped: Hit[] = [];
+    for (const h of hits) {
+      const key = h.kind + ":" + norm(h.title);
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(h);
+      }
+    }
+    this.hits.value = deduped;
   }
 
   private go(hit: Hit): void {
