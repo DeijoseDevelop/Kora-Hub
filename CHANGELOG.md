@@ -4,6 +4,24 @@ Todos los cambios notables de Kora Hub se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/) y
 [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.1] — 2026-10-08
+
+### Fixed
+
+- **Desktop Windows**: el sidecar Go abría una ventana de consola
+  (`-H windowsgui` añadido a ldflags). El `.exe` ahora abre directo.
+- **WebView2 auto-install**: `downloadBootstrapper` descarga e instala
+  WebView2 automáticamente si no está en Windows.
+- **NSIS**: instalación `currentUser` (sin permisos admin).
+- **Error handling**: si el sidecar no arranca en 20s, la ventana
+  muestra un mensaje claro en vez de quedarse en blanco.
+- **Search**: dedup de resultados local+servidor normalizado (trim +
+  lowercase) — tareas ya no aparecen duplicadas.
+- **Mobile**: modo local offline-first — la app funciona **sin servidor**.
+  Botón "Continuar sin conexión" en el login nativo.
+- **Mobile**: error `Unexpected token '<', "<!DOCTYPE"` al hacer login —
+  `safeJSON` detecta respuestas HTML y muestra error legible.
+
 ## [1.0.0] — 2026-10-07
 
 ### Added
