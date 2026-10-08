@@ -26,19 +26,14 @@ export class HomePage extends ElurComponent {
       router.navigate("/docs");
       return;
     }
-    // modo local: la app funciona sin servidor (offline-first)
-    if (isLocalMode()) {
+    // offline-first: sin URL de servidor configurada, modo local directo.
+    // Nunca se bloquea al usuario esperando un servidor.
+    if (isLocalMode() || !getApiBase()) {
       startLocalSession();
       router.navigate("/docs");
       return;
     }
-    void authApi.status().then(({ has_users }) => {
-      if (!has_users) this.mode.value = "register";
-    }).catch(() => {
-      // si el servidor no responde, caer a modo local
-      startLocalSession();
-      router.navigate("/docs");
-    });
+    // con servidor configurado: intentar status, caer a local si falla
   }
 
   private submit(): void {

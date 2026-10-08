@@ -213,8 +213,17 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     window.dispatchEvent(new CustomEvent("hub:logout"));
   }
   if (!res.ok) {
-    const body = await safeJSON<{ error?: { message?: string } }>(res).catch(() => ({} as Record<string, unknown>));
-    throw new Error((body as { error?: { message?: string } })?.error?.message ?? `HTTP ${res.status}`);
+    // safeJSON puede lanzar error legible (HTML en vez de JSON) —
+    // se propaga en vez de tragarse con .catch(() => ({}))
+    let msg = `HTTP ${res.status}`;
+    try {
+      const body = await safeJSON<{ error?: { message?: string } }>(res);
+      msg = body?.error?.message ?? msg;
+    } catch (e) {
+      // si safeJSON lanzó error legible, usarlo
+      msg = (e as Error).message ?? msg;
+    }
+    throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
   return safeJSON<T>(res);
